@@ -1,7 +1,7 @@
 Notes for everyone :
 
-#EXAMPLE#    - If the vision doesn't work
-
+QUESTION FOR EVERYONE [by Julien]: Where is the code run ? Is all the code loaded on the Thymio, and the computer sends the camera feed to the thymio, which filters, extracts the edges, computes the map, etc ? Or does the computer do 
+                                  and send a list of coordinates for all the edges, the thymio position, etc ? Same question for the navigation, etc
 
 Notes about vision:
 
