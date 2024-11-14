@@ -1,2 +1,2 @@
-# MICRO450_Mobile_Robots
-Group project for the EPFL Basics of Mobile Robotics course
+# MICRO452_Mobile_Robots
+Group project for the EPFL MICRO452 Basics of Mobile Robotics course
