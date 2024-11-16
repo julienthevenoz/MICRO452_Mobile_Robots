@@ -20,6 +20,7 @@ class state_machine:
         self.state_update()
       if state == 2:
         # local navigation
+        speed = self.thymio.local_navigation.
         self.state_update()
       if state == 3:
         # reach the goal 
