@@ -1,6 +1,10 @@
 class state_machine:
   def __init__():
-    self.thymio = 
+    self.thymio = MyThymio;
+    self.state = state;
+    # 
+    self.threshold_high = None;
+    self.threshold_low = None;
     
   def is_goal_reached(self):
     
