@@ -11,7 +11,7 @@ class state_machine:
     
   def is_obstacle_clear(self):
 
-  def state_uodate(self):
+  def state_update(self):
 
   def run(self):
     while is not self.is_goal_reached():
