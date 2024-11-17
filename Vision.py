@@ -1,3 +1,8 @@
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt 
+
+
 #Magic numbers
 #NB : opencv uses convention of [0,179], [0,255] and [0,255] for HSV values instead of the common [0,360],[0,100], [0,100]
 UPPER_GREEN = np.array([120,255,255], dtype='uint8')    
@@ -84,5 +89,4 @@ if __name__ == "__main__":
 
 
 
-obstacle_corners = [[(12,3),(12,5),(6,3),(6,5)],[(),(),()],[]]]
-Thymio_pose = [x,y,theta]
+# 
