@@ -1,5 +1,6 @@
 ##### interet de faire une class Vision_Thymio #####
 ##### le optimal path du coup il va ici où dans le fichier filtering ou ailleur? #####
+##### on fait un nouveau fichier pour le filtering ou il va où? #####
 # Camera & Image Processing
 
 def initialize_camera():
