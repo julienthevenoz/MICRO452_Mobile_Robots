@@ -3,6 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt 
 
 
+##### interet de faire une class Vision_Thymio #####
+##### le optimal path du coup il va ici où dans le fichier filtering ou ailleur? #####
+##### on fait un nouveau fichier pour le filtering ou il va où? #####
+
+# Camera & Image Processing
 #Magic numbers
 #NB : opencv uses convention of [0,179], [0,255] and [0,255] for HSV values instead of the common [0,360],[0,100], [0,100]
 UPPER_GREEN = np.array([120,255,255], dtype='uint8')    
@@ -31,12 +36,33 @@ def show_many_img(img_list, title_list):
     cv2.destroyAllWindows()
 
 
-
-
-
 class Vision_module():
     def __init__(self, image=None):
         self.img = image
+
+    # Camera & Image Processing
+
+    def initialize_camera(self):
+        return
+
+    def capture_image(self):
+        return
+    
+    # Map definition
+
+    def Image_correction(image): # distortions or perspective distortions, definition des bords et coin. Crop les bords de l'image
+        return
+    
+    ##### https://evergreenllc2020.medium.com/building-document-scanner-with-opencv-and-python-2306ee65c3db #####
+    
+    def extract_edge(self, img): ##### à merge/repmplacer par Image_correction #####
+        # img = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
+        show_img(img,'supposedly masked image')
+        blurred_img = cv2.GaussianBlur(img, ksize=[5,5],sigmaY=10,sigmaX=10)  
+        show_img(blurred_img,"blurred img")
+        cannied_img = cv2.Canny(blurred_img,100,200)
+        show_img(cannied_img, "canny edge image")
+        return cannied_img
 
     def get_colour_mask(self, img, lower, upper):
         original = img.copy()
@@ -46,20 +72,17 @@ class Vision_module():
         show_img(mask,"mask")
         return mask
 
+    def detect_thymio_position(image):
+        return
 
+    def detect_goal_position(image):
+        return
 
-    def extract_edge(self, img):
-        # img = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
-        show_img(img,'supposedly masked image')
-        blurred_img = cv2.GaussianBlur(img, ksize=[5,5],sigmaY=10,sigmaX=10)  
-        show_img(blurred_img,"blurred img")
-        cannied_img = cv2.Canny(blurred_img,100,200)
-        show_img(cannied_img, "canny edge image")
-        # cv2.findContours()
-        return cannied_img
+    def detect_obstacles(image):    #def les bords des obstacles
+        return
 
-
-
+    def map_rescaling (self):   #### a definir ou on le met exactement 
+        return 
 
 if __name__ == "__main__":
     filename = 'Photos/Photo2.jpg'
