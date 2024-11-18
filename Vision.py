@@ -55,13 +55,14 @@ class Vision_module():
         show_img(blurred_img,"blurred img")
         cannied_img = cv2.Canny(blurred_img,100,200)
         show_img(cannied_img, "canny edge image")
+        # cv2.findContours()
         return cannied_img
 
 
 
 
 if __name__ == "__main__":
-    filename = 'Photos/Photo1.jpg'
+    filename = 'Photos/Photo2.jpg'
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
     visio = Vision_module(img)
     mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
@@ -69,24 +70,6 @@ if __name__ == "__main__":
 
     cannied_img = visio.extract_edge(masked_img)
     
-    # # Show the images in separate windows
-    # cv2.imshow('basic', img)
-    # cv2.imshow('blurred', blurred_img)
-
-    # while True:
-    #     # Check if both windows are still open
-    #     if cv2.getWindowProperty('basic', cv2.WND_PROP_VISIBLE) < 1 and \
-    #     cv2.getWindowProperty('blurred', cv2.WND_PROP_VISIBLE) < 1:
-    #         break
-
-    #     # Optionally, allow the user to press Esc to close
-    #     key = cv2.waitKey(1)
-    #     if key == 27:  # 27 = ESC key
-    #         break
-
-    # # Cleanup
-    # cv2.destroyAllWindows()
-
 
 
 # 

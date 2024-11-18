@@ -125,3 +125,8 @@ if __name__ == "__main__":
 
     # # Cleanup
     # cv2.destroyAllWindows()
+
+
+
+obstacle_corners = [[(12,3),(12,5),(6,3),(6,5)],[(),(),()],[]]]
+Thymio_pose = [x,y,theta]

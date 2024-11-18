@@ -5,6 +5,14 @@ QUESTION FOR EVERYONE [by Julien]: Where is the code run ? Is all the code loade
 
 Notes about vision:
 
+Vision returns: (do you prefer numpy arrays)
+ Thymio_Position (x,y,theta) a tuple 
+ Goal position (x,y) a tuple 
+ Corners_list : list of obstacles (defined by X corners) = list of tuples = [(obs1_corner1, obs1_corner2, obs1_corner3, obs1_corner4), 
+                                                                             (obs2_corner1, obs2_corner2, obs2_corner3),
+                                                                             (obs3_corner1, obs3_corner2, obs3_corner3, obs3_corner4)]
+
+
 Notes about Navigation:
 
 Notes about Filtering:
