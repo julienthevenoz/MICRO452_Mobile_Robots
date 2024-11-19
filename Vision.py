@@ -184,7 +184,16 @@ class Vision_module():
         # return the warped image
         return warped
 
+    def detect_aruco(sel, img):
+        #convert to grayscale
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+        parameters =  cv2.aruco.DetectorParameters()
+        detector = cv2.aruco.ArucoDetector(dictionary, parameters)
 
+        markerCorners, markerIds, rejectedCandidates = detector.detectMarkers(img)
+
+        pass
 
     def detect_thymio_position(image):
         return
