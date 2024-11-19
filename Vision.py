@@ -20,7 +20,11 @@ LOWER_BROWN = np.array([0,0,0])
 def show_img(img,title):
     cv2.namedWindow(title, cv2.WINDOW_NORMAL)
     cv2.imshow(title, img)
-    cv2.waitKey(0)  # Wait for a key press to close the window
+    while True: 
+        if cv2.waitKey(100):  # Wait for a key press to close the window
+            break
+        if cv2.getWindowProperty(title, cv2.WND_PROP_VISIBLE) < 1:
+            break
     cv2.destroyAllWindows()
 
 
@@ -66,10 +70,10 @@ class Vision_module():
         gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
         show_img(gray,"gray img")
 
-        # blurred_img = cv2.GaussianBlur(gray, ksize=[5,5],sigmaY=10,sigmaX=10)  
-        # show_img(blurred_img,"blurred img")
+        blurred_img = cv2.GaussianBlur(gray, ksize=[5,5],sigmaY=10,sigmaX=10)  
+        show_img(blurred_img,"blurred img")
 
-        cannied_img = cv2.Canny(gray,75,200)
+        cannied_img = cv2.Canny(blurred_img,75,200)
         show_img(cannied_img, "canny edge image")
 
 
@@ -195,11 +199,11 @@ class Vision_module():
         return 
 
 if __name__ == "__main__":
-    filename = 'Photos/Photo4.jpg'
+    filename = 'Photos/Photo1.jpg'
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
     visio = Vision_module(img)
-    # mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
-    # masked_img = cv2.bitwise_and(img, img, mask=mask)  #apply color mask (keep only green pixels)
+    mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
+    masked_img = cv2.bitwise_and(img, img, mask=mask)  #apply color mask (keep only green pixels)
 
     contours = visio.extract_edge(img)
     corners = visio.find_map_corners(contours)
