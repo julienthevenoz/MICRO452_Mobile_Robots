@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
+#from sklearn.cluster import KMeans ##### librairie pour le K-mean #####
 
 
 ##### interet de faire une class Vision_Thymio #####
@@ -15,6 +16,8 @@ LOWER_GREEN = np.array([70,0,0], dtype='uint8')
 
 UPPER_BROWN = np.array([60,255,255])
 LOWER_BROWN = np.array([0,0,0])
+
+
 
 
 def show_img(img,title):
@@ -94,6 +97,30 @@ class Vision_module():
         show_img(mask,"mask")
         return mask
     
+    def kmeans_color_segmentation(self, img, n_clusters=3): ##### Pour le K-mean #####
+        """
+        Segments the image into `n_clusters` regions using OpenCV's K-means clustering.
+        """
+        # Convert image to RGB
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    
+        # Reshape image to a 2D array of pixels
+        pixels = img_rgb.reshape((-1, 3)).astype('float32')
+    
+        # Define criteria and apply kmeans()
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.2)
+        _, labels, centers = cv2.kmeans(pixels, n_clusters, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
+    
+        # Convert centers to uint8 and replace pixels with their cluster's center
+        centers = np.uint8(centers)
+        segmented_img = centers[labels.flatten()]
+        segmented_img = segmented_img.reshape(img_rgb.shape)
+    
+        # Display the original and segmented images
+        show_many_img([img, segmented_img], ["Original Image", "Segmented Image"])
+    
+        return segmented_img, labels.reshape(img.shape[:2])
+
     def find_map_corners(self, contours):
         #we sort our contours by area, in descending order, and we only need to keep first 5
         # of them since we're looking for a very big object (the map)
@@ -195,11 +222,14 @@ class Vision_module():
         return 
 
 if __name__ == "__main__":
-    filename = 'Photos/Photo4.jpg'
+    filename = 'Photos/cartons_brun_obstacles_noir.jpg'
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
     visio = Vision_module(img)
     # mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
     # masked_img = cv2.bitwise_and(img, img, mask=mask)  #apply color mask (keep only green pixels)
+
+    # K-means segmentation
+    segmented_img, labels = visio.kmeans_color_segmentation(img, n_clusters=5)
 
     contours = visio.extract_edge(img)
     corners = visio.find_map_corners(contours)
@@ -207,9 +237,7 @@ if __name__ == "__main__":
     corners = visio.order_points(corners)
     #now we can apply the transform to get a perpendicular top-view
     top_view_img = visio.four_point_transform(img,corners)
+    
     show_img(top_view_img,'topi gang')
 
     
-
-
-
