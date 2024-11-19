@@ -1,7 +1,8 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-#from sklearn.cluster import KMeans ##### librairie pour le K-mean #####
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans ##### librairie pour le K-mean, le PCA,... #####
 
 
 ##### interet de faire une class Vision_Thymio #####
@@ -95,47 +96,39 @@ class Vision_module():
         show_img(mask,"mask")
         return mask
     
-    def kmeans_color_segmentation(self, img, n_clusters=3): ##### K-mean #####
+    def kmeans_color_segmentation(self, img, n_clusters=3):
         """
-        Segments the image into `n_clusters` regions using OpenCV's K-means clustering.
-        Then, assigns different colors (obstacle, background, robot, etc.) based on the clusters.
+        Segments the image into `n_clusters` regions using K-means clustering,
+        and maps each region to a specific color.
         """
-        # Convert image to HSV for better color segmentation
-        img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        # Step 1: Preprocess image
+        blurred_img = cv2.GaussianBlur(img, (5, 5), 0)  # Gaussian blur to reduce noise
+        img_rgb = cv2.cvtColor(blurred_img, cv2.COLOR_BGR2RGB)
+        pixels = img_rgb.reshape((-1, 3)).astype('float32')  # Flatten image to a 2D array
 
-        # Reshape image to a 2D array of pixels
-        pixels = img_hsv.reshape((-1, 3)).astype('float32')
+        # Step 2: Apply K-means clustering
+        kmeans = KMeans(n_clusters=n_clusters, random_state=0)
+        labels = kmeans.fit_predict(pixels)
+        centers = np.uint8(kmeans.cluster_centers_)  # Cluster centers (colors)
+        segmented_pixels = centers[labels]  # Replace each pixel with its cluster center
+        segmented_img = segmented_pixels.reshape(img.shape)  # Reshape to original image size
 
-        # Define criteria and apply kmeans()
-        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.2)
-        _, labels, centers = cv2.kmeans(pixels, n_clusters, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
-
-        # Convert centers to uint8 and replace pixels with their cluster's center
-        centers = np.uint8(centers)
-        segmented_img = centers[labels.flatten()]
-        segmented_img = segmented_img.reshape(img_hsv.shape)
-
-        # Define color mapping for different clusters
+        # Step 3: Map clusters to specific colors
         color_map = {
-            0: [0, 0, 255],        # Obstacle - Black
-            1: [0, 255, 0],        # Green
-            2: [220, 180, 0],      # Robot - Red (or white depending on your robot)
-            3: [0, 0, 0],          
-            # white
+            0: [0, 0, 0],        # Obstacle - Black
+            1: [0, 130, 180],   # Background - Brownish
+            2: [0, 220, 230],    # Robot - Cyan
+            3: [60, 255, 0],     # Water - Green
         }
+        result_img = np.zeros_like(segmented_img)  # Initialize result image
+        labels_reshaped = labels.reshape(img.shape[:2])  # Reshape labels to 2D (H x W)
 
-        # Create an empty image to store the results
-        result_img = np.zeros_like(img)
-
-        # Ensure that the labels are reshaped correctly
-        labels_reshaped = labels.reshape(img.shape[0], img.shape[1])
-
-        # Assign the color to each pixel based on its cluster label
         for i in range(n_clusters):
-            result_img[labels_reshaped == i] = color_map.get(i, [255, 255, 255])  # Default to white if no color map defined for cluster
+            mask = (labels_reshaped == i)  # Mask for current cluster
+            result_img[mask] = color_map.get(i, [255, 255, 255])  # Assign color based on cluster
 
-        # Display the original and segmented images
-        show_many_img([img, result_img], ["Original Image", "Segmented Image"])
+        # Step 4: Display the original and segmented images
+        show_many_img([img, segmented_img, result_img], ["Original Image", "Segmented (Raw)", "Segmented (Mapped Colors)"])
 
         return result_img, labels_reshaped
 
@@ -241,14 +234,14 @@ class Vision_module():
         return 
 
 if __name__ == "__main__":
-    filename = 'Photos/cartons_brun_obstacles_noir.jpg'
+    filename = 'Photos/Photo2.jpg'
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
     visio = Vision_module(img)
     # mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
     # masked_img = cv2.bitwise_and(img, img, mask=mask)  #apply color mask (keep only green pixels)
 
     # K-means segmentation
-    segmented_img, labels = visio.kmeans_color_segmentation(img, n_clusters=5)
+    segmented_img, labels = visio.kmeans_color_segmentation(img, n_clusters=3)
 
     contours = visio.extract_edge(img)
     corners = visio.find_map_corners(contours)
