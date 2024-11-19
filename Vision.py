@@ -21,7 +21,7 @@ def show_img(img,title):
     cv2.namedWindow(title, cv2.WINDOW_NORMAL)
     cv2.imshow(title, img)
     while True: 
-        if cv2.waitKey(100):  # Wait for a key press to close the window
+        if cv2.waitKey(1) & 255==ord('q'):  # Wait for a q press or window closed to close the window
             break
         if cv2.getWindowProperty(title, cv2.WND_PROP_VISIBLE) < 1:
             break
