@@ -68,9 +68,9 @@ class Vision_module():
     
     def extract_edge(self, img): ##### à merge/repmplacer par Image_correction #####
         # img = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
-        show_img(img,'supposedly masked image')
+        # show_img(img,'supposedly masked image')
         gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-        show_img(gray,"gray img")
+        # show_img(gray,"gray img")
 
         blurred_img = cv2.GaussianBlur(gray, ksize=[5,5],sigmaY=10,sigmaX=10)  
         show_img(blurred_img,"blurred img")
@@ -89,7 +89,7 @@ class Vision_module():
             color = (random.randint(0,256), random.randint(0,256), random.randint(0,256))
             cv2.drawContours(drawing, contours, i, color, 2, cv2.LINE_8, hierarchy, 0)
         # Show in a window
-        show_img(drawing,'Contours')
+        # show_img(drawing,'Contours')
         return contours
 
     def get_colour_mask(self, img, lower, upper):
@@ -97,7 +97,7 @@ class Vision_module():
         img = cv2.GaussianBlur(img, (5, 5), 0)  #apply gaussian smoothing
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)   #transform to Hue(=color)-Saturation-Value(=brightness) format to make color detection easier
         mask = cv2.inRange(img, lower, upper)
-        show_img(mask,"mask")
+        # show_img(mask,"mask")
         return mask
     
     def kmeans_color_segmentation(self, img, n_clusters=3):
@@ -226,13 +226,19 @@ class Vision_module():
     def detect_aruco(sel, img):
         #convert to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        show_img(gray,'gray')
         dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
         parameters =  cv2.aruco.DetectorParameters()
         detector = cv2.aruco.ArucoDetector(dictionary, parameters)
 
-        markerCorners, markerIds, rejectedCandidates = detector.detectMarkers(img)
-
-        pass
+        markerCorners, markerIds, _ = detector.detectMarkers(gray)
+        if markerIds is not None:
+            frame_markers = cv2.aruco.drawDetectedMarkers(img.copy(), markerCorners, markerIds)
+            print(f"Detected markers: {markerIds.flatten()}")
+            show_img(frame_markers, 'frame markers')
+        else:
+            print("no markers")
+        return markerCorners, markerIds
 
     def detect_thymio_position(image):
         return
@@ -247,23 +253,25 @@ class Vision_module():
         return 
 
 if __name__ == "__main__":
-    filename = 'Photos/Photo1.jpg'
-    filename = 'Photos/Photo2.jpg'
+    filename = 'Photos/Photo5.jpg'
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
     visio = Vision_module(img)
-    mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
-    masked_img = cv2.bitwise_and(img, img, mask=mask)  #apply color mask (keep only green pixels)
+    # mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
+    # masked_img = cv2.bitwise_and(img, img, mask=mask)  #apply color mask (keep only green pixels)
 
     # K-means segmentation
+    corners, ids = visio.detect_aruco(img)
+
     segmented_img, labels = visio.kmeans_color_segmentation(img, n_clusters=3)
 
-    contours = visio.extract_edge(img)
-    corners = visio.find_map_corners(contours)
+    # contours = visio.extract_edge(img)
+    # corners = visio.find_map_corners(contours)
     #now that we have the 4 corners of the map, we have to order them
-    corners = visio.order_points(corners)
+    # corners = visio.order_points(corners)
     #now we can apply the transform to get a perpendicular top-view
-    top_view_img = visio.four_point_transform(img,corners)
+    # top_view_img = visio.four_point_transform(img,corners)
+
     
-    show_img(top_view_img,'topi gang')
+    # show_img(top_view_img,'topi gang')
 
     
