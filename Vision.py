@@ -172,8 +172,9 @@ class Vision_module():
     def order_points(self,pts):
         '''Takes an input vector of points (=size 4x2) representing 
         the 4 corners of a rectangle and returns the same points re-ordered
-        as : Top-right, Top-left, Bottom-left, Bottom-right
+        as : Top-left, Top-right, Bottom-right, Bottom-left
         '''
+        pts = np.array(pts) #transform in a numpy array
         rect = np.zeros((4, 2), dtype = "float32")
         # the top-left point will have the smallest sum, whereas
         # the bottom-right point will have the largest sum
@@ -226,7 +227,7 @@ class Vision_module():
     def detect_aruco(sel, img):
         #convert to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        show_img(gray,'gray')
+        # show_img(gray,'gray')
         dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
         parameters =  cv2.aruco.DetectorParameters()
         detector = cv2.aruco.ArucoDetector(dictionary, parameters)
@@ -235,16 +236,68 @@ class Vision_module():
         if markerIds is not None:
             frame_markers = cv2.aruco.drawDetectedMarkers(img.copy(), markerCorners, markerIds)
             print(f"Detected markers: {markerIds.flatten()}")
-            show_img(frame_markers, 'frame markers')
+            # show_img(frame_markers, 'frame markers')
         else:
             print("no markers")
         return markerCorners, markerIds
+    
+    def get_6_markers(self,img):
+        '''Find 6 markers and return an array of them sorted in the order :
+        [TL, TR, BR, BL, Thymio, Goal]'''
+        markers, ids = self.detect_aruco(img)
+        #verifiy that we have the 6 markers
+        if not(len(ids)==6):
+            print(f"Detected {len(ids)} markers instead of 6")
+            #exit(1)
+            return None
+        pairs = sorted(list(zip(ids,markers))) #make a list of corresponding [id,marker] pairs, then sort it
+        ids, markers = zip(*pairs) #unzip the pairs : ids are now in order 0-5 and the corresponding aruco corner markers are in the same order
+        return markers
+        
+    def get_map_corners(self,markers):
+        '''Gets the 4 corners of the map based on the marker positions'''
+    
+        #only keep the first 4 ones, corresponding to the corners
+        markers = markers[:4]
+        corners_of_markers = []
+        for i in range(4):
+            center,_ = self.find_marker_center_and_orientation(markers[i][0])
+            marker_centers = cv2.circle(img,center, 10, (0,0,255),2) #this is just for debugging
+            corners_of_markers.append(center)
+        show_img(marker_centers,"centers of markers")
+        return corners_of_markers
+    
+    def find_marker_center_and_orientation(self, marker):
+        '''Returns the center point of four coordinates (must be given
+        in TL,TR,BR,BL order)'''
+        #we're gonna calculate the interception of the diagonals to find the center
+        tl,tr,br,bl = marker
+        alpha = (tr[1] - bl[1]) / (tr[0]-bl[0]) #slope of bl->tr diagonal is : delta_y / delta_x = y2-y4 / x2-x4
+        beta = (tl[1]-br[1]) / (tl[0] - br[0]) #slope of br->tl diagonal is y1-y3 / x1 - x3
+        #if you find the slope and intercept of each diagonal, equate them and isolate x, you get this
+        #do the math yourself
+        x_center = (tl[1] - tr[1] - beta*tl[0] + alpha*tr[0]) / (alpha - beta)  
+        y_center = alpha*x_center + (tr[1] - alpha*tr[0]) # use the equation of the bl->tr diagonal to find y_center
 
-    def detect_thymio_position(image):
-        return
+        #now we will use the dot product to find the relative angle between the top side of the marker (tl->tr) and the horizontal
+        top_side = np.array([[tr[0]-tl[0]],[tr[1]-tr[1]]])
+        top_side = top_side / np.linalg.norm(top_side) #normalize the vector
+        unit_hvec = np.array([1,0])  #unitary horizontal vector
+        theta = np.arccos(np.dot(top_side,unit_hvec)) # v1 dot v2 = ||v1||*||v2||*cos(theta) = cos(theta) if vects are unitary
+        return (int(x_center),int(y_center), theta)
+        
 
-    def detect_goal_position(image):
-        return
+    def detect_thymio_pose(self,markers):
+        '''Returns (x,y,theta) corresponding to Thymio position and orientation '''
+        thymio_marker = markers[4]
+        return self.find_marker_center_and_orientation(thymio_marker)
+    
+
+    def detect_goal_position(self, image):
+        ''' Return (x,y) corresponding to goal position'''
+        goal_marker = markers[5]
+        x,y,_ = self.find_marker_center_and_orientation(goal_marker)
+        return (x,y)
 
     def detect_obstacles(image):    #def les bords des obstacles
         return
@@ -253,25 +306,35 @@ class Vision_module():
         return 
 
 if __name__ == "__main__":
-    filename = 'Photos/Photo5.jpg'
+    filename = 'Photos/Photo6.jpg'
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
     visio = Vision_module(img)
     # mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
     # masked_img = cv2.bitwise_and(img, img, mask=mask)  #apply color mask (keep only green pixels)
 
     # K-means segmentation
-    corners, ids = visio.detect_aruco(img)
-
-    segmented_img, labels = visio.kmeans_color_segmentation(img, n_clusters=3)
+    # corners, ids = visio.detect_aruco(img)
+    # segmented_img, labels = visio.kmeans_color_segmentation(img, n_clusters=3)
 
     # contours = visio.extract_edge(img)
     # corners = visio.find_map_corners(contours)
     #now that we have the 4 corners of the map, we have to order them
     # corners = visio.order_points(corners)
     #now we can apply the transform to get a perpendicular top-view
-    # top_view_img = visio.four_point_transform(img,corners)
+    markers = visio.get_6_markers(img)
+    corners = visio.get_map_corners(markers)
+    top_view_img = visio.four_point_transform(img,corners)
+    thymio_pose = visio.detect_thymio_pose(markers)
+    goal_pos = visio.detect_goal_position(markers)
 
+    #let's draw an arrow from the center of the thymio in the direction where it's looking
+    arrow_length = 30 #in pixels
+    start = thymio_pose[:2]
+    end = start + [arrow_length*np.cos(thymio_pose[2]),arrow_length*np.sin(thymio_pose[2])]  
+    annotated_top_view = cv2.arrowedLine(top_view_img,start, end, (255,0,0), 2)
+    #let's put a green circle on top of the goal
+    annotated_top_view = cv2.circle(annotated_top_view, goal_pos, 20, (0,255,0), 2)
     
-    # show_img(top_view_img,'topi gang')
+    show_img(annotated_top_view,'topi gang')
 
     
