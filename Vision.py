@@ -151,7 +151,6 @@ class Vision_module():
             approx = cv2.approxPolyDP(c, perimeter*0.02, True) #create a polygon that approximates the curve
             drawing = np.zeros((self.img.shape[0], self.img.shape[1], 3), dtype=np.uint8)
             drawn = cv2.drawContours(drawing,approx,-1, (0,255,0), 3)
-            # drawn = cv2.drawContours(drawing, c, -1, (0,0,255), 2)
             print(len(approx))
             show_img(drawn,f"contour nb{i}")
             if len(approx) == 4:
@@ -171,40 +170,15 @@ class Vision_module():
             print("no 4 corner contour")
             return None
 
-    def order_points(self,pts):
-        '''Takes an input vector of points (=size 4x2) representing 
-        the 4 corners of a rectangle and returns the same points re-ordered
-        as : Top-left, Top-right, Bottom-right, Bottom-left
-        '''
-        pts = np.array(pts,dtype='int32') #transform in a numpy array
-        rect = np.zeros((4, 2), dtype = "float32")
-        # the top-left point will have the smallest sum, whereas
-        # the bottom-right point will have the largest sum
-        s = pts.sum(axis = 1)
-        rect[0] = pts[np.argmin(s)]
-        rect[2] = pts[np.argmax(s)]
-        # now, compute the difference between the points, the
-        # top-right point will have the smallest difference (& it will be negative),
-        # whereas the bottom-left will have the largest difference (& it will be positive)
-        diff = np.diff(pts, axis = 1)
-        rect[1] = pts[np.argmin(diff)]  #problem is here 
-        rect[3] = pts[np.argmax(diff)]  #and here$
-        # return the ordered coordinates
-        return rect
-    
-
     def four_point_transform(self, image, pts):
         # obtain a consistent order of the points and unpack them
         # individually''
-        # rect = self.order_points(pts)
         (tl, tr, br, bl) = pts.astype('int32')
         self.highlight_corners(self.img,pts,'after no point ordering')
-        # (tl,tr,br,bl) = pts
         # compute the width of the new image, which will be the
         # maximum distance between bottom-right and bottom-left
         # x-coordiates or the top-right and top-left x-coordinates
         widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
-        a,b,c,d = br[0] - bl[0], br[1] - bl[1], tr[0] - tl[0], tr[1] - tl[1]
         widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
         maxWidth = max(int(widthA), int(widthB))
         # compute the height of the new image, which will be the
@@ -241,7 +215,6 @@ class Vision_module():
         if markerIds is not None:
             frame_markers = cv2.aruco.drawDetectedMarkers(img.copy(), markerCorners, markerIds)
             print(f"Detected markers: {markerIds.flatten()}")
-            # show_img(frame_markers, 'frame markers')
         else:
             print("no markers")
         return markerCorners, markerIds
@@ -267,7 +240,6 @@ class Vision_module():
         #only keep the first 4 ones, corresponding to the corners
         markers = markers[:4]
         corners_of_markers = []
-        # colors = [(0,0,255),(0,255,0),(255,0,0),(0,255,255)]  #red, green, blue, yellow
         for i in range(4):
             center = self.find_marker_center_and_orientation(markers[i])[:2]  #we only keep x and y, not theta
             corners_of_markers.append(center)
@@ -321,15 +293,9 @@ class Vision_module():
         x_max = np.max(self.map_corners[:,0])
         y_min = np.min(self.map_corners[:,1]) #find the min on the y-ayis
         y_max = np.max(self.map_corners[:,1])
-        # x_min = min(self.map_corners[0][0],self.map_corners[3][0]) #find what is min pixel x-coordinate between TL and BL (horizontal)
-        # x_max = max(self.map_corners[1][0],self.map_corners[2][0]) #find what is max pixel x-coordinate between TR and BR
-        # y_min = min(self.map_corners[0][1],self.map_corners[1][1])  #find what is min pixel y-coordinate between TR and TL (vertical)
-        # y_max = max(self.map_corners[2][1],self.map_corners[3][1])  #find what is min pixel  y-coordinate between BR and BL
         rescaled_pts = []
         for pt in pts:
             rescaled_x, rescaled_y = pt
-            # a = rescaled_x - x_min
-            # b = a / (x_max - )
             rescaled_x = self.map_size[0]*(rescaled_x - x_min) / (x_max - x_min)  #map scale * (x normalized w/ regard to map pixel dimensions)
             rescaled_y = self.map_size[1]*(rescaled_y - y_min) / (y_max - y_min)
             rescaled_pts.append((rescaled_x, rescaled_y))
@@ -340,10 +306,8 @@ class Vision_module():
         corners = np.array(corners, dtype='int32').squeeze()
         colors = [(0,0,255),(0,255,0),(255,0,0),(0,255,255)]  #red, green, blue, yellow
         for i in range(4):
-            # center = self.find_marker_center_and_orientation(markers[i])[:2]  #we only keep x and y, not theta
             print(corners[i],colors[i])
             highlighted_corners = cv2.circle(img,corners[i], 20, colors[i],4) #this is just for debugging
-        # corners_of_markers.append(center)
         show_img(highlighted_corners,title)
 
 
