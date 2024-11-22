@@ -196,13 +196,15 @@ class Vision_module():
     def four_point_transform(self, image, pts):
         # obtain a consistent order of the points and unpack them
         # individually''
-        rect = self.order_points(pts)
-        (tl, tr, br, bl) = rect
+        # rect = self.order_points(pts)
+        (tl, tr, br, bl) = pts.astype('int32')
+        self.highlight_corners(self.img,pts,'after no point ordering')
         # (tl,tr,br,bl) = pts
         # compute the width of the new image, which will be the
         # maximum distance between bottom-right and bottom-left
         # x-coordiates or the top-right and top-left x-coordinates
         widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
+        a,b,c,d = br[0] - bl[0], br[1] - bl[1], tr[0] - tl[0], tr[1] - tl[1]
         widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
         maxWidth = max(int(widthA), int(widthB))
         # compute the height of the new image, which will be the
@@ -222,8 +224,9 @@ class Vision_module():
             [maxWidth - 1, maxHeight - 1],
             [0, maxHeight - 1]], dtype = "float32")
         # compute the perspective transform matrix and then apply it
-        M = cv2.getPerspectiveTransform(rect, dst)
+        M = cv2.getPerspectiveTransform(pts.astype('float32'), dst)
         warped = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
+        self.highlight_corners(warped, dst)
         # return the warped image
         return warped
 
@@ -264,12 +267,12 @@ class Vision_module():
         #only keep the first 4 ones, corresponding to the corners
         markers = markers[:4]
         corners_of_markers = []
+        # colors = [(0,0,255),(0,255,0),(255,0,0),(0,255,255)]  #red, green, blue, yellow
         for i in range(4):
             center = self.find_marker_center_and_orientation(markers[i])[:2]  #we only keep x and y, not theta
-            marker_centers = cv2.circle(self.img,center, 10, (0,0,255),2) #this is just for debugging
             corners_of_markers.append(center)
-        show_img(marker_centers,"centers of markers")
         self.map_corners = np.array(corners_of_markers)  #save the pixel coordinates of the map corners
+        self.highlight_corners(self.img,corners_of_markers)
         return np.array(corners_of_markers)
     
     def find_marker_center_and_orientation(self, marker):
@@ -331,6 +334,18 @@ class Vision_module():
             rescaled_y = self.map_size[1]*(rescaled_y - y_min) / (y_max - y_min)
             rescaled_pts.append((rescaled_x, rescaled_y))
         return rescaled_pts
+    
+    def highlight_corners(self, image, corners, title='highlighted corners'):
+        img = image.copy()
+        corners = np.array(corners, dtype='int32').squeeze()
+        colors = [(0,0,255),(0,255,0),(255,0,0),(0,255,255)]  #red, green, blue, yellow
+        for i in range(4):
+            # center = self.find_marker_center_and_orientation(markers[i])[:2]  #we only keep x and y, not theta
+            print(corners[i],colors[i])
+            highlighted_corners = cv2.circle(img,corners[i], 20, colors[i],4) #this is just for debugging
+        # corners_of_markers.append(center)
+        show_img(highlighted_corners,title)
+
 
 if __name__ == "__main__":
     filename = 'Photos/Photo7.jpg'
