@@ -43,9 +43,11 @@ def show_many_img(img_list, title_list):
 
 
 class Vision_module():
-    def __init__(self, image=None):
+    def __init__(self, image=None, map_size=(1000,1000)):
         self.img = image
         self.cam = None
+        self.map_corners = None
+        self.map_size = map_size  #arbitrary chosen metric of our map
 
     # Camera & Image Processing
 
@@ -174,7 +176,7 @@ class Vision_module():
         the 4 corners of a rectangle and returns the same points re-ordered
         as : Top-left, Top-right, Bottom-right, Bottom-left
         '''
-        pts = np.array(pts) #transform in a numpy array
+        pts = np.array(pts,dtype='int32') #transform in a numpy array
         rect = np.zeros((4, 2), dtype = "float32")
         # the top-left point will have the smallest sum, whereas
         # the bottom-right point will have the largest sum
@@ -182,11 +184,11 @@ class Vision_module():
         rect[0] = pts[np.argmin(s)]
         rect[2] = pts[np.argmax(s)]
         # now, compute the difference between the points, the
-        # top-right point will have the smallest difference,
-        # whereas the bottom-left will have the largest difference
+        # top-right point will have the smallest difference (& it will be negative),
+        # whereas the bottom-left will have the largest difference (& it will be positive)
         diff = np.diff(pts, axis = 1)
-        rect[1] = pts[np.argmin(diff)]
-        rect[3] = pts[np.argmax(diff)]
+        rect[1] = pts[np.argmin(diff)]  #problem is here 
+        rect[3] = pts[np.argmax(diff)]  #and here$
         # return the ordered coordinates
         return rect
     
@@ -196,6 +198,7 @@ class Vision_module():
         # individually''
         rect = self.order_points(pts)
         (tl, tr, br, bl) = rect
+        # (tl,tr,br,bl) = pts
         # compute the width of the new image, which will be the
         # maximum distance between bottom-right and bottom-left
         # x-coordiates or the top-right and top-left x-coordinates
@@ -227,7 +230,6 @@ class Vision_module():
     def detect_aruco(sel, img):
         #convert to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        # show_img(gray,'gray')
         dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
         parameters =  cv2.aruco.DetectorParameters()
         detector = cv2.aruco.ArucoDetector(dictionary, parameters)
@@ -242,8 +244,9 @@ class Vision_module():
         return markerCorners, markerIds
     
     def get_6_markers(self,img):
-        '''Find 6 markers and return an array of them sorted in the order :
-        [TL, TR, BR, BL, Thymio, Goal]'''
+        '''Find 6 markers and return 3D array of them sorted in the order :
+        [TL, TR, BR, BL, Thymio, Goal]. Dim1 is markers, dim2 is corners of the marker
+        dim3 is x and y of the corner'''
         markers, ids = self.detect_aruco(img)
         #verifiy that we have the 6 markers
         if not(len(ids)==6):
@@ -252,6 +255,7 @@ class Vision_module():
             return None
         pairs = sorted(list(zip(ids,markers))) #make a list of corresponding [id,marker] pairs, then sort it
         ids, markers = zip(*pairs) #unzip the pairs : ids are now in order 0-5 and the corresponding aruco corner markers are in the same order
+        markers = np.array(markers).squeeze()  #get rid of the useless exterior array
         return markers
         
     def get_map_corners(self,markers):
@@ -261,15 +265,16 @@ class Vision_module():
         markers = markers[:4]
         corners_of_markers = []
         for i in range(4):
-            center,_ = self.find_marker_center_and_orientation(markers[i][0])
-            marker_centers = cv2.circle(img,center, 10, (0,0,255),2) #this is just for debugging
+            center = self.find_marker_center_and_orientation(markers[i])[:2]  #we only keep x and y, not theta
+            marker_centers = cv2.circle(self.img,center, 10, (0,0,255),2) #this is just for debugging
             corners_of_markers.append(center)
         show_img(marker_centers,"centers of markers")
-        return corners_of_markers
+        self.map_corners = np.array(corners_of_markers)  #save the pixel coordinates of the map corners
+        return np.array(corners_of_markers)
     
     def find_marker_center_and_orientation(self, marker):
         '''Returns the center point of four coordinates (must be given
-        in TL,TR,BR,BL order)'''
+        in TL,TR,BR,BL order) and its orientation as an array of int'''
         #we're gonna calculate the interception of the diagonals to find the center
         tl,tr,br,bl = marker
         alpha = (tr[1] - bl[1]) / (tr[0]-bl[0]) #slope of bl->tr diagonal is : delta_y / delta_x = y2-y4 / x2-x4
@@ -280,16 +285,16 @@ class Vision_module():
         y_center = alpha*x_center + (tr[1] - alpha*tr[0]) # use the equation of the bl->tr diagonal to find y_center
 
         #now we will use the dot product to find the relative angle between the top side of the marker (tl->tr) and the horizontal
-        top_side = np.array([[tr[0]-tl[0]],[tr[1]-tr[1]]])
+        top_side = np.array([tr[0]-tl[0],tr[1]-tl[1]])
         top_side = top_side / np.linalg.norm(top_side) #normalize the vector
         unit_hvec = np.array([1,0])  #unitary horizontal vector
         theta = np.arccos(np.dot(top_side,unit_hvec)) # v1 dot v2 = ||v1||*||v2||*cos(theta) = cos(theta) if vects are unitary
-        return (int(x_center),int(y_center), theta)
+        return np.array([x_center,y_center, theta], dtype='uint32')  #####!!!! does this fuck up ? if theta is in radian, enforcing type int will fuck it up
         
 
     def detect_thymio_pose(self,markers):
         '''Returns (x,y,theta) corresponding to Thymio position and orientation '''
-        thymio_marker = markers[4]
+        thymio_marker = (markers[4])
         return self.find_marker_center_and_orientation(thymio_marker)
     
 
@@ -304,9 +309,31 @@ class Vision_module():
 
     def map_rescaling (self):   #### a definir ou on le met exactement 
         return 
+    
+    def rescale_points(self,pts):
+        '''Takes a list of points given in pixel coordinates of the original image and 
+        rescale them according to our map coordinates'''
+
+        x_min = np.min(self.map_corners[:,0]) #find the min on the x-axis
+        x_max = np.max(self.map_corners[:,0])
+        y_min = np.min(self.map_corners[:,1]) #find the min on the y-ayis
+        y_max = np.max(self.map_corners[:,1])
+        # x_min = min(self.map_corners[0][0],self.map_corners[3][0]) #find what is min pixel x-coordinate between TL and BL (horizontal)
+        # x_max = max(self.map_corners[1][0],self.map_corners[2][0]) #find what is max pixel x-coordinate between TR and BR
+        # y_min = min(self.map_corners[0][1],self.map_corners[1][1])  #find what is min pixel y-coordinate between TR and TL (vertical)
+        # y_max = max(self.map_corners[2][1],self.map_corners[3][1])  #find what is min pixel  y-coordinate between BR and BL
+        rescaled_pts = []
+        for pt in pts:
+            rescaled_x, rescaled_y = pt
+            # a = rescaled_x - x_min
+            # b = a / (x_max - )
+            rescaled_x = self.map_size[0]*(rescaled_x - x_min) / (x_max - x_min)  #map scale * (x normalized w/ regard to map pixel dimensions)
+            rescaled_y = self.map_size[1]*(rescaled_y - y_min) / (y_max - y_min)
+            rescaled_pts.append((rescaled_x, rescaled_y))
+        return rescaled_pts
 
 if __name__ == "__main__":
-    filename = 'Photos/Photo6.jpg'
+    filename = 'Photos/Photo7.jpg'
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
     visio = Vision_module(img)
     # mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
@@ -324,17 +351,28 @@ if __name__ == "__main__":
     markers = visio.get_6_markers(img)
     corners = visio.get_map_corners(markers)
     top_view_img = visio.four_point_transform(img,corners)
+    show_img(top_view_img, 'top 1')
     thymio_pose = visio.detect_thymio_pose(markers)
     goal_pos = visio.detect_goal_position(markers)
-
     #let's draw an arrow from the center of the thymio in the direction where it's looking
-    arrow_length = 30 #in pixels
+    arrow_length = 100 #in pixels
     start = thymio_pose[:2]
-    end = start + [arrow_length*np.cos(thymio_pose[2]),arrow_length*np.sin(thymio_pose[2])]  
-    annotated_top_view = cv2.arrowedLine(top_view_img,start, end, (255,0,0), 2)
+    end = (int(start[0] + arrow_length*np.cos(thymio_pose[2])), int(start[1] + arrow_length*np.sin(thymio_pose[2])))
+    # end = start + (arrow_length*np.cos(thymio_pose[2]),arrow_length*np.sin(thymio_pose[2]))
+    original_image = cv2.arrowedLine(img,start, end, (255,0,0), 20)
     #let's put a green circle on top of the goal
-    annotated_top_view = cv2.circle(annotated_top_view, goal_pos, 20, (0,255,0), 2)
-    
-    show_img(annotated_top_view,'topi gang')
+    original_image = cv2.circle(original_image, goal_pos, 20, (0,255,0), 5)
+    show_img(original_image,'OG image')
 
+    ###convert everything to map scale
+    pts = visio.rescale_points([*corners, thymio_pose[:2], goal_pos])
+    *r_corners, r_thymio, r_goal = pts
+    r_goal = np.array(r_goal).astype(int)
+    top_view_img = cv2.circle(top_view_img, r_goal, 20, (0,255,0), 5)
+    start = np.array(r_thymio).astype(int)
+    end = (int(start[0] + arrow_length*np.cos(thymio_pose[2])), int(start[1] + arrow_length*np.sin(thymio_pose[2])))
+    top_view_img = cv2.arrowedLine(top_view_img,start, end, (255,0,0), 20) #the angle should be off
+    show_img(top_view_img, 'top view')
+    print(0)
+    
     
