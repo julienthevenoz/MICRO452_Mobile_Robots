@@ -19,6 +19,7 @@ UPPER_BROWN = np.array([60,255,255])
 LOWER_BROWN = np.array([0,0,0])
 
 MIN_AREA = 80
+DIST_THRESHOLD = 1000
 
 
 def show_img(img,title):
@@ -63,12 +64,12 @@ class Vision_module():
     
     # Map definition
 
-    def Image_correction(image): # distortions or perspective distortions, definition des bords et coin. Crop les bords de l'image
+    #def Image_correction(image): # distortions or perspective distortions, definition des bords et coin. Crop les bords de l'image
         return
     
     ##### https://evergreenllc2020.medium.com/building-document-scanner-with-opencv-and-python-2306ee65c3db #####
     
-    def extract_edge(self, img): ##### à merge/repmplacer par Image_correction #####
+    #def extract_edge(self, img): ##### à merge/repmplacer par Image_correction #####
         # img = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
         show_img(img,'supposedly masked image')
         gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
@@ -94,6 +95,42 @@ class Vision_module():
         show_img(drawing,'Contours')
         return contours
 
+    def distance(self, p1, p2):
+        """Calcul de la distance euclidienne entre deux points"""
+        return np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
+    
+    def merge_nearby_points(self, points, threshold=10):
+        """
+        Fusionne les points qui sont plus proches que le seuil donné.
+        threshold : distance maximum pour fusionner les points
+        """
+        print("Début de la fusion des points :")
+        merged_points = []
+
+        for point in points:
+            # Vérifie si le point est suffisamment éloigné des points déjà ajoutés
+            if not merged_points:
+                merged_points.append(point)
+            else:
+                # Compare le point actuel avec les points déjà dans merged_points
+                is_nearby = False
+                for i, merged_point in enumerate(merged_points):
+                    distance_value = self.distance(point, merged_point)  # Calcul de la distance
+                    print(f"Comparing point {point} with {merged_point}, distance: {distance_value}")  # Débogage
+                    if distance_value < threshold:
+                        # Si le point est proche, on remplace le point existant par la moyenne
+                        merged_points[i] = ((merged_point[0] + point[0]) // 2, 
+                                             (merged_point[1] + point[1]) // 2)
+                        is_nearby = True
+                        break
+                # Si le point n'est pas proche de tout autre point, on l'ajoute à la liste
+                if not is_nearby:
+                    merged_points.append(point)
+
+        print(f"Points fusionnés : {merged_points}")
+        return merged_points
+
+
     def detect_obstacle_corners(self, img):
         """
         Détecte les bords des obstacles dans l'image, les approxime par des polygones,
@@ -101,13 +138,13 @@ class Vision_module():
         """
         # 1. Conversion de l'image en HSV pour une analyse des couleurs
         hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        
+
         # 2. Conversion de l'image en niveaux de gris
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        
+
         # 3. Application d'un flou pour réduire le bruit
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        
+
         # 4. Détection des bords avec Canny
         edges = cv2.Canny(blurred, threshold1=150, threshold2=200)
 
@@ -125,7 +162,7 @@ class Vision_module():
         title_list = ["Original Image", "Image en Niveaux de Gris", "Image Floutée", "Bords détectés (Canny)"]  # Titres correspondants
 
         # Affichage des images étape par étape
-        show_many_img(img_list, title_list) 
+        #show_many_img(img_list, title_list) 
 
         # 9. Plage de teinte pour le noir (en HSV)
         lower_black_hsv = np.array([0, 0, 30])
@@ -148,18 +185,18 @@ class Vision_module():
             # Calcul de la moyenne des couleurs à l'intérieur du polygone en HSV
             mean_color_hsv = cv2.mean(hsv_img, mask=mask)  # Retourne (H, S, V, alpha)
 
-            # Extraire la teinte (H) de la couleur moyenne
-            #mean_hue = mean_color_hsv[0]
-
             # Si la teinte est proche de celle du noir, on garde le polygone
             if ((lower_black_hsv[0] <= mean_color_hsv[0] <= upper_black_hsv[0]) and 
                 (lower_black_hsv[1] <= mean_color_hsv[1] <= upper_black_hsv[1]) and 
                 (lower_black_hsv[2] <= mean_color_hsv[2] <= upper_black_hsv[2])):
-                # Ajouter les coins du polygone à la liste
-                obstacle_corners.append(approx.reshape(-1, 2))  # Convertir en liste de points (x, y)
                 
+                # Fusionner les points proches et les ajouter à la liste
+                merged_corners = self.merge_nearby_points(approx.reshape(-1, 2), DIST_THRESHOLD)
+                obstacle_corners.append(merged_corners)  # Ajouter les coins fusionnés
+
                 # Dessiner le polygone sur l'image pour la visualisation
-                cv2.drawContours(img_with_polygons, [approx], -1, (0, 255, 0), 2)  # Contour en vert
+                color = np.random.randint(0, 256, 3).tolist()  # Créer une couleur aléatoire (RGB)
+                cv2.drawContours(img_with_polygons, [approx], -1, color, 2)  # Contour avec couleur aléatoire
                 for (x, y) in approx.reshape(-1, 2):
                     cv2.circle(img_with_polygons, (x, y), 5, (0, 0, 255), -1)  # Coin en rouge
 
@@ -169,6 +206,14 @@ class Vision_module():
 
         # Afficher la dernière image avec les polygones dessinés
         show_many_img(img_list, title_list)
+
+        # Afficher les coordonnées de chaque polygone après la fusion
+        for idx, corners in enumerate(obstacle_corners):
+            print(f"Polygone {idx + 1}:")
+            for corner in corners:
+                # Convertir le coin en tuple classique avant l'affichage
+                print(f"  Coin: ({int(corner[0])}, {int(corner[1])})")
+
 
         # Retourner la liste des coins des obstacles et l'image avec les polygones dessinés
         return obstacle_corners, img_with_polygons
@@ -385,7 +430,7 @@ if __name__ == "__main__":
     obstacle_corners, img_with_polygons = visio.detect_obstacle_corners(img)
 
     # Afficher les coins des obstacles (s'il y en a)
-    print("Coins des obstacles détectés :", obstacle_corners)
+    #print("Coins des obstacles détectés :", obstacle_corners)
 
     # Optionnellement, afficher l'image finale avec les polygones détectés
     cv2.imshow("Polygones et coins", img_with_polygons)
