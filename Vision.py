@@ -312,7 +312,7 @@ class Vision_module():
 
 
 if __name__ == "__main__":
-    filename = 'Photos/Photo7.jpg'
+    filename = 'Photos/Tymio_islands.jpg'
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
     visio = Vision_module(img)
     # mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
