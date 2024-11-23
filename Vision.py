@@ -97,44 +97,88 @@ class Vision_module():
         img = cv2.GaussianBlur(img, (5, 5), 0)  #apply gaussian smoothing
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)   #transform to Hue(=color)-Saturation-Value(=brightness) format to make color detection easier
         mask = cv2.inRange(img, lower, upper)
-        show_img(mask,"mask")
+        # show_img(mask,"mask")
         return mask
     
+    def color_segmentation(self, img):
+        """
+        Segmente l'image en fonction des couleurs spécifiques : noir, blanc, et bleu (mer).
+        """
+        # Convertir l'image en HSV
+        hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        
+        # Définir les plages de couleur pour chaque catégorie
+        # Plage de couleur pour le noir
+        lower_black = np.array([0, 0, 30])
+        upper_black = np.array([179, 120, 80])
+
+        # Plage de couleur pour le blanc
+        lower_white = np.array([0, 0, 100])
+        upper_white = np.array([179, 50, 250])
+
+        # Plage de couleur pour le bleu (mer)
+        lower_blue = np.array([85, 40, 100])
+        upper_blue = np.array([110, 210, 200])
+
+        # Créer des masques pour chaque couleur
+        black_mask = cv2.inRange(hsv_img, lower_black, upper_black)
+        white_mask = cv2.inRange(hsv_img, lower_white, upper_white)
+        blue_mask = cv2.inRange(hsv_img, lower_blue, upper_blue)
+
+        # Combiner les masques
+        combined_mask = cv2.bitwise_or(black_mask, white_mask)
+        combined_mask = cv2.bitwise_or(combined_mask, blue_mask)
+
+        # Appliquer le masque à l'image pour isoler les objets
+        result_img = cv2.bitwise_and(img, img, mask=combined_mask)
+
+        return result_img
+
     def kmeans_color_segmentation(self, img, n_clusters=3):
         """
-        Segments the image into `n_clusters` regions using K-means clustering,
-        and maps each region to a specific color.
+        Segmente l'image en utilisant K-means clustering pour détecter les couleurs principales.
+        - Blanc (Thymio)
+        - Noir (Obstacles)
+        - Bleu (Fond/Mer)
         """
-        # Step 1: Preprocess image
-        blurred_img = cv2.GaussianBlur(img, (5, 5), 0)  # Gaussian blur to reduce noise
-        img_rgb = cv2.cvtColor(blurred_img, cv2.COLOR_BGR2RGB)
-        pixels = img_rgb.reshape((-1, 3)).astype('float32')  # Flatten image to a 2D array
+        # Convertir l'image en RGB
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convertir l'image en RGB
 
-        # Step 2: Apply K-means clustering
+        # Redimensionner l'image en une liste de pixels
+        pixels = img_rgb.reshape((-1, 3)).astype('float32')  # Aplatir l'image en un tableau 2D
+
+        # Appliquer K-means
         kmeans = KMeans(n_clusters=n_clusters, random_state=0)
-        labels = kmeans.fit_predict(pixels)
-        centers = np.uint8(kmeans.cluster_centers_)  # Cluster centers (colors)
-        segmented_pixels = centers[labels]  # Replace each pixel with its cluster center
-        segmented_img = segmented_pixels.reshape(img.shape)  # Reshape to original image size
+        labels = kmeans.fit_predict(pixels)  # Récupérer les labels de chaque pixel
+        centers = np.uint8(kmeans.cluster_centers_)  # Récupérer les centres des clusters
 
-        # Step 3: Map clusters to specific colors
+        # Définir une fonction pour calculer la luminosité (pour la séparation des couleurs)
+        def brightness(color):
+            return np.mean(color)
+
+        # Trier les clusters en fonction de leur luminosité
+        sorted_indices = np.argsort([brightness(center) for center in centers])
+        black_cluster = sorted_indices[0]  # Cluster le plus sombre = Noir
+        white_cluster = sorted_indices[-1]  # Cluster le plus lumineux = Blanc
+        blue_cluster = sorted_indices[1]  # Cluster intermédiaire = Bleu (mer)
+
+        # Mappage des clusters vers les couleurs spécifiées
         color_map = {
-            0: [0, 0, 0],        # Obstacle - Black
-            1: [0, 130, 180],   # Background - Brownish
-            2: [0, 220, 230],    # Robot - Cyan
-            3: [60, 255, 0],     # Water - Green
+            black_cluster: [0, 0, 0],  # Noir pour les obstacles
+            blue_cluster: [255, 0, 0],  # Bleu pour la mer
+            white_cluster: [255, 255, 255],  # Blanc pour Thymio
         }
-        result_img = np.zeros_like(segmented_img)  # Initialize result image
-        labels_reshaped = labels.reshape(img.shape[:2])  # Reshape labels to 2D (H x W)
 
-        for i in range(n_clusters):
-            mask = (labels_reshaped == i)  # Mask for current cluster
-            result_img[mask] = color_map.get(i, [255, 255, 255])  # Assign color based on cluster
+        # Appliquer les couleurs mappées sur l'image
+        labels_reshaped = labels.reshape(img.shape[:2])  # Redimensionner les labels à la taille de l'image originale
+        result_img = np.zeros_like(img)  # Initialiser l'image résultat
 
-        # Step 4: Display the original and segmented images
-        show_many_img([img, segmented_img, result_img], ["Original Image", "Segmented (Raw)", "Segmented (Mapped Colors)"])
+        for cluster, color in color_map.items():
+            result_img[labels_reshaped == cluster] = color  # Assigner la couleur aux pixels correspondants
 
-        return result_img, labels_reshaped
+        return result_img, labels
+
+
 
     def find_map_corners(self, contours):
         #we sort our contours by area, in descending order, and we only need to keep first 5
@@ -245,22 +289,29 @@ class Vision_module():
         return 
 
 if __name__ == "__main__":
-    filename = 'Photos/IMG_20241112_172833.jpg'
+    filename = 'Photos/tymio_islands_resised_no_boats.jpg'
+
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
     visio = Vision_module(img)
-    mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
-    masked_img = cv2.bitwise_and(img, img, mask=mask)  #apply color mask (keep only green pixels)
 
-    # K-means segmentation
-    segmented_img, labels = visio.kmeans_color_segmentation(img, n_clusters=3)
-
-    contours = visio.extract_edge(img)
-    corners = visio.find_map_corners(contours)
-    #now that we have the 4 corners of the map, we have to order them
-    corners = visio.order_points(corners)
-    #now we can apply the transform to get a perpendicular top-view
-    top_view_img = visio.four_point_transform(img,corners)
+    show_img(img, "Original Image")
     
-    show_img(top_view_img,'topi gang')
+    #mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
+    #masked_img = cv2.bitwise_and(img, img, mask=mask)  # apply color mask (keep only green pixels)
+
+    #Thresholding
+    segmented_img = visio.color_segmentation(img)
+    # K-means segmentation
+    #segmented_img, labels = visio.kmeans_color_segmentation(thresholded_img, n_clusters=3)
+
+    show_img(segmented_img, "Filtered Image")
+
+    # Commented out parts for top-view transformation
+    # contours = visio.extract_edge(img)
+    # corners = visio.find_map_corners(contours)
+    # corners = visio.order_points(corners)
+    # top_view_img = visio.four_point_transform(img, corners)
+    # show_img(top_view_img, 'topi gang')
+
 
     
