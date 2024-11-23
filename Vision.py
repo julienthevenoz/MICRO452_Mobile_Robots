@@ -18,6 +18,8 @@ LOWER_GREEN = np.array([70,0,0], dtype='uint8')
 UPPER_BROWN = np.array([60,255,255])
 LOWER_BROWN = np.array([0,0,0])
 
+MIN_AREA = 80
+
 
 def show_img(img,title):
     cv2.namedWindow(title, cv2.WINDOW_NORMAL)
@@ -91,6 +93,85 @@ class Vision_module():
         # Show in a window
         show_img(drawing,'Contours')
         return contours
+
+    def detect_obstacle_corners(self, img):
+        """
+        Détecte les bords des obstacles dans l'image, les approxime par des polygones,
+        et garde uniquement ceux dont la couleur moyenne est noire (obstacles).
+        """
+        # 1. Conversion de l'image en HSV pour une analyse des couleurs
+        hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        
+        # 2. Conversion de l'image en niveaux de gris
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        
+        # 3. Application d'un flou pour réduire le bruit
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        
+        # 4. Détection des bords avec Canny
+        edges = cv2.Canny(blurred, threshold1=150, threshold2=200)
+
+        # 5. Trouver les contours dans l'image avec la méthode findContours
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # 6. Liste pour stocker les coins des obstacles
+        obstacle_corners = []
+
+        # 7. Image pour visualiser les polygones détectés
+        img_with_polygons = img.copy()
+
+        # 8. Liste des images à afficher
+        img_list = [img, gray, blurred, edges]  # Liste des images à afficher à chaque étape
+        title_list = ["Original Image", "Image en Niveaux de Gris", "Image Floutée", "Bords détectés (Canny)"]  # Titres correspondants
+
+        # Affichage des images étape par étape
+        show_many_img(img_list, title_list) 
+
+        # 9. Plage de teinte pour le noir (en HSV)
+        lower_black_hsv = np.array([0, 0, 30])
+        upper_black_hsv = np.array([179, 120, 120])  # Ajustez selon vos besoins
+
+        # 10. Parcourir chaque contour trouvé
+        for contour in contours:
+            # Approximation du contour par un polygone
+            epsilon = 0.02 * cv2.arcLength(contour, True)  # Précision de l'approximation
+            approx = cv2.approxPolyDP(contour, epsilon, True)
+
+            area = cv2.contourArea(contour)
+            if area < MIN_AREA:
+                continue  # Ignorer ce polygone et passer au suivant
+
+            # Créer un masque pour extraire l'intérieur du polygone
+            mask = np.zeros_like(hsv_img[:, :, 0])  # Masque pour la teinte (H)
+            cv2.drawContours(mask, [approx], -1, (255), thickness=cv2.FILLED)
+
+            # Calcul de la moyenne des couleurs à l'intérieur du polygone en HSV
+            mean_color_hsv = cv2.mean(hsv_img, mask=mask)  # Retourne (H, S, V, alpha)
+
+            # Extraire la teinte (H) de la couleur moyenne
+            #mean_hue = mean_color_hsv[0]
+
+            # Si la teinte est proche de celle du noir, on garde le polygone
+            if ((lower_black_hsv[0] <= mean_color_hsv[0] <= upper_black_hsv[0]) and 
+                (lower_black_hsv[1] <= mean_color_hsv[1] <= upper_black_hsv[1]) and 
+                (lower_black_hsv[2] <= mean_color_hsv[2] <= upper_black_hsv[2])):
+                # Ajouter les coins du polygone à la liste
+                obstacle_corners.append(approx.reshape(-1, 2))  # Convertir en liste de points (x, y)
+                
+                # Dessiner le polygone sur l'image pour la visualisation
+                cv2.drawContours(img_with_polygons, [approx], -1, (0, 255, 0), 2)  # Contour en vert
+                for (x, y) in approx.reshape(-1, 2):
+                    cv2.circle(img_with_polygons, (x, y), 5, (0, 0, 255), -1)  # Coin en rouge
+
+        # Ajouter l'image avec les polygones dessinés à la liste des images
+        img_list.append(img_with_polygons)
+        title_list.append("Polygones détectés et Coins")  # Titre pour l'image finale avec les polygones
+
+        # Afficher la dernière image avec les polygones dessinés
+        show_many_img(img_list, title_list)
+
+        # Retourner la liste des coins des obstacles et l'image avec les polygones dessinés
+        return obstacle_corners, img_with_polygons
 
     def get_colour_mask(self, img, lower, upper):
         original = img.copy()
@@ -292,19 +373,34 @@ if __name__ == "__main__":
     filename = 'Photos/tymio_islands_resised_no_boats.jpg'
 
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
-    visio = Vision_module(img)
+    # Vérifier si l'image est correctement chargée
+    if img is None:
+        print("Erreur lors du chargement de l'image")
+        exit()
 
-    show_img(img, "Original Image")
+    # Créer une instance de Vision_module
+    visio = Vision_module()
+
+    # Appeler la méthode pour détecter les coins des obstacles
+    obstacle_corners, img_with_polygons = visio.detect_obstacle_corners(img)
+
+    # Afficher les coins des obstacles (s'il y en a)
+    print("Coins des obstacles détectés :", obstacle_corners)
+
+    # Optionnellement, afficher l'image finale avec les polygones détectés
+    cv2.imshow("Polygones et coins", img_with_polygons)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
     
     #mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
     #masked_img = cv2.bitwise_and(img, img, mask=mask)  # apply color mask (keep only green pixels)
 
     #Thresholding
-    segmented_img = visio.color_segmentation(img)
+    #segmented_img = visio.color_segmentation(img)
     # K-means segmentation
     #segmented_img, labels = visio.kmeans_color_segmentation(thresholded_img, n_clusters=3)
 
-    show_img(segmented_img, "Filtered Image")
+    #show_img(segmented_img, "Filtered Image")
 
     # Commented out parts for top-view transformation
     # contours = visio.extract_edge(img)
