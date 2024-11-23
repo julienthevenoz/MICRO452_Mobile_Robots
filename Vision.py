@@ -72,10 +72,10 @@ class Vision_module():
         gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
         show_img(gray,"gray img")
 
-        blurred_img = cv2.GaussianBlur(gray, ksize=[5,5],sigmaY=10,sigmaX=10)  
-        show_img(blurred_img,"blurred img")
+        #blurred_img = cv2.GaussianBlur(gray, ksize=[5,5],sigmaY=10,sigmaX=10)  
+        #show_img(blurred_img,"blurred img")
 
-        cannied_img = cv2.Canny(blurred_img,75,200)
+        cannied_img = cv2.Canny(gray,75,200)
         show_img(cannied_img, "canny edge image")
 
 
@@ -136,7 +136,6 @@ class Vision_module():
 
         return result_img, labels_reshaped
 
-
     def find_map_corners(self, contours):
         #we sort our contours by area, in descending order, and we only need to keep first 5
         # of them since we're looking for a very big object (the map)
@@ -189,7 +188,6 @@ class Vision_module():
         # return the ordered coordinates
         return rect
     
-
     def four_point_transform(self, image, pts):
         # obtain a consistent order of the points and unpack them
         # individually''
@@ -247,8 +245,7 @@ class Vision_module():
         return 
 
 if __name__ == "__main__":
-    filename = 'Photos/Photo1.jpg'
-    filename = 'Photos/Photo2.jpg'
+    filename = 'Photos/IMG_20241112_172833.jpg'
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
     visio = Vision_module(img)
     mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
