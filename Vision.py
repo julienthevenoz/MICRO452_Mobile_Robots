@@ -1,8 +1,8 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans ##### librairie pour le K-mean, le PCA,... #####
+#import matplotlib.pyplot as plt
+#from sklearn.decomposition import PCA
+#from sklearn.cluster import KMeans ##### librairie pour le K-mean, le PCA,... #####
 
 
 ##### interet de faire une class Vision_Thymio #####
@@ -12,14 +12,14 @@ from sklearn.cluster import KMeans ##### librairie pour le K-mean, le PCA,... ##
 # Camera & Image Processing
 #Magic numbers
 #NB : opencv uses convention of [0,179], [0,255] and [0,255] for HSV values instead of the common [0,360],[0,100], [0,100]
-UPPER_GREEN = np.array([120,255,255], dtype='uint8')    
-LOWER_GREEN = np.array([70,0,0], dtype='uint8')
+#UPPER_GREEN = np.array([120,255,255], dtype='uint8')    
+#LOWER_GREEN = np.array([70,0,0], dtype='uint8')
 
-UPPER_BROWN = np.array([60,255,255])
-LOWER_BROWN = np.array([0,0,0])
+#UPPER_BROWN = np.array([60,255,255])
+#LOWER_BROWN = np.array([0,0,0])
 
 MIN_AREA = 80
-DIST_THRESHOLD = 1000
+DIST_THRESHOLD = 10
 
 
 def show_img(img,title):
@@ -99,36 +99,45 @@ class Vision_module():
         """Calcul de la distance euclidienne entre deux points"""
         return np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
     
-    def merge_nearby_points(self, points, threshold=10):
+    def merge_polygons(self, obstacle_corners, threshold=10):
         """
-        Fusionne les points qui sont plus proches que le seuil donné.
-        threshold : distance maximum pour fusionner les points
+        Fusionne des polygones dont les coins sont proches.
+        obstacle_corners : liste des coins des polygones.
+        threshold : distance maximale pour considérer deux points comme proches.
         """
-        print("Début de la fusion des points :")
-        merged_points = []
+        merged = []
 
-        for point in points:
-            # Vérifie si le point est suffisamment éloigné des points déjà ajoutés
-            if not merged_points:
-                merged_points.append(point)
-            else:
-                # Compare le point actuel avec les points déjà dans merged_points
-                is_nearby = False
-                for i, merged_point in enumerate(merged_points):
-                    distance_value = self.distance(point, merged_point)  # Calcul de la distance
-                    print(f"Comparing point {point} with {merged_point}, distance: {distance_value}")  # Débogage
-                    if distance_value < threshold:
-                        # Si le point est proche, on remplace le point existant par la moyenne
-                        merged_points[i] = ((merged_point[0] + point[0]) // 2, 
-                                             (merged_point[1] + point[1]) // 2)
-                        is_nearby = True
+        for polygon in obstacle_corners:
+            added = False
+
+            for merged_polygon in merged:
+                # Vérifiez si le polygone actuel est proche de l'un des polygones fusionnés
+                for point in polygon:
+                    if any(np.linalg.norm(np.array(point) - np.array(merged_point)) < threshold 
+                           for merged_point in merged_polygon):
+                        # Si oui, fusionnez les coins
+                        merged_polygon.extend(polygon)
+                        added = True
                         break
-                # Si le point n'est pas proche de tout autre point, on l'ajoute à la liste
-                if not is_nearby:
-                    merged_points.append(point)
 
-        print(f"Points fusionnés : {merged_points}")
-        return merged_points
+                if added:
+                    break
+
+            if not added:
+                # Si le polygone n'est pas proche d'un polygone fusionné existant, ajoutez-le tel quel
+                merged.append(list(polygon))
+
+        # Nettoyez les doublons dans les points fusionnés
+        merged_cleaned = []
+        for merged_polygon in merged:
+            cleaned = []
+            for point in merged_polygon:
+                if not any(np.linalg.norm(np.array(point) - np.array(existing_point)) < threshold 
+                           for existing_point in cleaned):
+                    cleaned.append(point)
+            merged_cleaned.append(cleaned)
+
+        return merged_cleaned
 
 
     def detect_obstacle_corners(self, img):
@@ -157,18 +166,11 @@ class Vision_module():
         # 7. Image pour visualiser les polygones détectés
         img_with_polygons = img.copy()
 
-        # 8. Liste des images à afficher
-        img_list = [img, gray, blurred, edges]  # Liste des images à afficher à chaque étape
-        title_list = ["Original Image", "Image en Niveaux de Gris", "Image Floutée", "Bords détectés (Canny)"]  # Titres correspondants
-
-        # Affichage des images étape par étape
-        #show_many_img(img_list, title_list) 
-
-        # 9. Plage de teinte pour le noir (en HSV)
+        # 8. Plage de teinte pour le noir (en HSV)
         lower_black_hsv = np.array([0, 0, 30])
         upper_black_hsv = np.array([179, 120, 120])  # Ajustez selon vos besoins
 
-        # 10. Parcourir chaque contour trouvé
+        # 9. Parcourir chaque contour trouvé
         for contour in contours:
             # Approximation du contour par un polygone
             epsilon = 0.02 * cv2.arcLength(contour, True)  # Précision de l'approximation
@@ -189,36 +191,31 @@ class Vision_module():
             if ((lower_black_hsv[0] <= mean_color_hsv[0] <= upper_black_hsv[0]) and 
                 (lower_black_hsv[1] <= mean_color_hsv[1] <= upper_black_hsv[1]) and 
                 (lower_black_hsv[2] <= mean_color_hsv[2] <= upper_black_hsv[2])):
-                
-                # Fusionner les points proches et les ajouter à la liste
-                merged_corners = self.merge_nearby_points(approx.reshape(-1, 2), DIST_THRESHOLD)
-                obstacle_corners.append(merged_corners)  # Ajouter les coins fusionnés
 
-                # Dessiner le polygone sur l'image pour la visualisation
-                color = np.random.randint(0, 256, 3).tolist()  # Créer une couleur aléatoire (RGB)
-                cv2.drawContours(img_with_polygons, [approx], -1, color, 2)  # Contour avec couleur aléatoire
-                for (x, y) in approx.reshape(-1, 2):
-                    cv2.circle(img_with_polygons, (x, y), 5, (0, 0, 255), -1)  # Coin en rouge
+                # Ajouter les coins du polygone à la liste
+                obstacle_corners.append(approx.reshape(-1, 2).tolist())
 
-        # Ajouter l'image avec les polygones dessinés à la liste des images
-        img_list.append(img_with_polygons)
-        title_list.append("Polygones détectés et Coins")  # Titre pour l'image finale avec les polygones
+        # 10. Fusionner les polygones proches
+        obstacle_corners = self.merge_polygons(obstacle_corners, DIST_THRESHOLD)
 
-        # Afficher la dernière image avec les polygones dessinés
-        show_many_img(img_list, title_list)
+        # 11. Dessiner les polygones fusionnés sur l'image
+        for polygon in obstacle_corners:
+            polygon_array = np.array(polygon, dtype=np.int32)  # Convertir en format attendu par OpenCV
+            color = np.random.randint(0, 256, 3).tolist()  # Couleur aléatoire pour chaque polygone
+            cv2.drawContours(img_with_polygons, [polygon_array], -1, color, 2)  # Dessiner le contour
+            for (x, y) in polygon:
+                cv2.circle(img_with_polygons, (x, y), 5, (0, 0, 255), -1)  # Dessiner les coins en rouge
 
-        # Afficher les coordonnées de chaque polygone après la fusion
+        # 12. Afficher les coins des polygones fusionnés
         for idx, corners in enumerate(obstacle_corners):
-            print(f"Polygone {idx + 1}:")
+            print(f"Polygone {idx + 1}: Nombre de coins = {len(corners)}")
             for corner in corners:
-                # Convertir le coin en tuple classique avant l'affichage
-                print(f"  Coin: ({int(corner[0])}, {int(corner[1])})")
+                print(f"  Coin: ({corner[0]}, {corner[1]})")
 
-
-        # Retourner la liste des coins des obstacles et l'image avec les polygones dessinés
+        # 13. Retourner les coins des polygones et l'image avec les polygones dessinés
         return obstacle_corners, img_with_polygons
 
-    def get_colour_mask(self, img, lower, upper):
+    #def get_colour_mask(self, img, lower, upper):
         original = img.copy()
         img = cv2.GaussianBlur(img, (5, 5), 0)  #apply gaussian smoothing
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)   #transform to Hue(=color)-Saturation-Value(=brightness) format to make color detection easier
@@ -226,7 +223,7 @@ class Vision_module():
         # show_img(mask,"mask")
         return mask
     
-    def color_segmentation(self, img):
+    #def color_segmentation(self, img):
         """
         Segmente l'image en fonction des couleurs spécifiques : noir, blanc, et bleu (mer).
         """
@@ -260,7 +257,7 @@ class Vision_module():
 
         return result_img
 
-    def kmeans_color_segmentation(self, img, n_clusters=3):
+    #def kmeans_color_segmentation(self, img, n_clusters=3):
         """
         Segmente l'image en utilisant K-means clustering pour détecter les couleurs principales.
         - Blanc (Thymio)
@@ -304,9 +301,7 @@ class Vision_module():
 
         return result_img, labels
 
-
-
-    def find_map_corners(self, contours):
+    #def find_map_corners(self, contours):
         #we sort our contours by area, in descending order, and we only need to keep first 5
         # of them since we're looking for a very big object (the map)
 
@@ -338,7 +333,7 @@ class Vision_module():
             print("no 4 corner contour")
             return None
 
-    def order_points(self,pts):
+    #def order_points(self,pts):
         '''Takes an input vector of points (=size 4x2) representing 
         the 4 corners of a rectangle and returns the same points re-ordered
         as : Top-right, Top-left, Bottom-left, Bottom-right
@@ -358,7 +353,7 @@ class Vision_module():
         # return the ordered coordinates
         return rect
     
-    def four_point_transform(self, image, pts):
+    #def four_point_transform(self, image, pts):
         # obtain a consistent order of the points and unpack them
         # individually''
         rect = self.order_points(pts)
@@ -391,7 +386,7 @@ class Vision_module():
         # return the warped image
         return warped
 
-    def detect_aruco(sel, img):
+    #def detect_aruco(sel, img):
         #convert to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
@@ -402,16 +397,16 @@ class Vision_module():
 
         pass
 
-    def detect_thymio_position(image):
+    #def detect_thymio_position(image):
         return
 
-    def detect_goal_position(image):
+    #def detect_goal_position(image):
         return
 
-    def detect_obstacles(image):    #def les bords des obstacles
+    #def detect_obstacles(image):    #def les bords des obstacles
         return
 
-    def map_rescaling (self):   #### a definir ou on le met exactement 
+    #def map_rescaling (self):   #### a definir ou on le met exactement 
         return 
 
 if __name__ == "__main__":
@@ -429,9 +424,6 @@ if __name__ == "__main__":
     # Appeler la méthode pour détecter les coins des obstacles
     obstacle_corners, img_with_polygons = visio.detect_obstacle_corners(img)
 
-    # Afficher les coins des obstacles (s'il y en a)
-    #print("Coins des obstacles détectés :", obstacle_corners)
-
     # Optionnellement, afficher l'image finale avec les polygones détectés
     cv2.imshow("Polygones et coins", img_with_polygons)
     cv2.waitKey(0)
@@ -441,7 +433,7 @@ if __name__ == "__main__":
     #masked_img = cv2.bitwise_and(img, img, mask=mask)  # apply color mask (keep only green pixels)
 
     #Thresholding
-    #segmented_img = visio.color_segmentation(img)
+    # segmented_img = visio.color_segmentation(img)
     # K-means segmentation
     #segmented_img, labels = visio.kmeans_color_segmentation(thresholded_img, n_clusters=3)
 
