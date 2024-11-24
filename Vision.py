@@ -238,7 +238,35 @@ class Vision_module():
         markers = np.array(markers).squeeze()  #get rid of the useless exterior array
         ids = np.array(ids).squeeze()
         return markers, ids
-        
+
+    def get_2_markers(self, top_view_img):
+        """
+        Find 2 markers (Thymio and Goal) in the top-view image
+        """
+        markers, ids = self.detect_aruco(top_view_img)
+
+        # Verify that we have at least the two desired markers
+        if not (len(ids) >= 2):
+            print(f"Detected {len(ids)} markers instead of at least 2.")
+            return markers.squeeze(), ids.squeeze()
+
+        # Identify markers by their IDs: assume Thymio (e.g., ID=4) and Goal (e.g., ID=5)
+        thymio_marker = None
+        goal_marker = None
+        for marker, marker_id in zip(markers, ids):
+            if marker_id == 4:  # Replace '4' with the actual ID for Thymio
+                thymio_marker = marker
+            elif marker_id == 5:  # Replace '5' with the actual ID for Goal
+                goal_marker = marker
+
+        if thymio_marker is None:
+            print("Unable to detect Thymio.")
+            return False
+        if goal_marker is None:
+            print("Unable to detect the Goal marker.")
+            return False
+        return thymio_marker, goal_marker
+
     def get_map_corners(self,markers, ids):
         '''Gets the 4 corners of the map based on the marker positions'''
     
@@ -262,7 +290,7 @@ class Vision_module():
             #     self.map_corners[1,1,:] = center
 
         # self.map_corners = np.array(corners_of_markers)  #save the pixel coordinates of the map corners
-        self.highlight_corners(self.img,self.map_corners)
+        # self.highlight_corners(self.img,self.map_corners)
         print(f"{len(ids)} markers detected, corners in memory are : {self.map_corners}")
         return self.map_corners
     
@@ -279,25 +307,23 @@ class Vision_module():
         y_center = alpha*x_center + (tr[1] - alpha*tr[0]) # use the equation of the bl->tr diagonal to find y_center
 
         #now we will use the dot product to find the relative angle between the top side of the marker (tl->tr) and the horizontal
-        top_side = np.array([tr[0]-tl[0],tr[1]-tl[1]])
+        top_side = np.array([tr[0]-br[0],tr[1]-br[1]])
         top_side = top_side / np.linalg.norm(top_side) #normalize the vector
         unit_hvec = np.array([1,0])  #unitary horizontal vector
         theta = np.arccos(np.dot(top_side,unit_hvec)) # v1 dot v2 = ||v1||*||v2||*cos(theta) = cos(theta) if vects are unitary
         return x_center,y_center, theta
 
-    def detect_thymio_pose(self,markers):
+    def detect_thymio_pose(self,thymio_marker):
         '''Returns integer position array [x,y,z=0] and float theta corresponding to Thymio position and orientation '''
-        thymio_marker = (markers[4])
         x,y,theta = self.find_marker_center_and_orientation(thymio_marker)
         #we return the position with 
-        return np.array([x,y,0], dtype='int32'), theta 
-    
+        return np.array([x,y], dtype='int32'), theta
 
-    def detect_goal_position(self, markers):
+
+    def detect_goal_position(self, goal_marker):
         ''' Return int array [x,y,z=0] corresponding to goal position'''
-        goal_marker = markers[5]
         x,y,_ = self.find_marker_center_and_orientation(goal_marker)
-        return np.array([x,y,0], dtype='int32')
+        return np.array([x,y], dtype='int32')
 
     def detect_obstacles(image):    #def les bords des obstacles
         return
@@ -336,7 +362,7 @@ class Vision_module():
 
 
 if __name__ == "__main__":
-    filename = 'Photos/Photo7.jpg'
+    filename = 'Photos/Photo_test_aruco.jpg'
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
     visio = Vision_module(img)
 
@@ -344,30 +370,18 @@ if __name__ == "__main__":
     markers, ids = visio.get_6_markers(img)
     corners = visio.get_map_corners(markers, ids)
     top_view_img, four_point_matrix = visio.four_point_transform(img,corners)
-    thymio_pose, thymio_theta = visio.detect_thymio_pose(markers)
-    goal_pos = visio.detect_goal_position(markers)
-    #let's put a green circle on top of the goal
-    original_image = cv2.circle(img, goal_pos[:2], 20, (0,255,0), 5)
-    #let's draw an arrow from the center of the thymio in the direction where it's looking
-    arrow_length = 100 #in pixels
-    start = thymio_pose[:2]
-    end = (int(start[0] + arrow_length*np.cos(thymio_theta)), int(start[1] + arrow_length*np.sin(thymio_theta)))
-    # end = start + (arrow_length*np.cos(thymio_pose[2]),arrow_length*np.sin(thymio_pose[2]))
-    original_image = cv2.arrowedLine(original_image,start, end, (255,0,0), 20)
-    #let's put a green circle on top of the goal
-    original_image = cv2.circle(original_image, goal_pos[:2], 20, (0,255,0), 5)
-    show_img(original_image,'OG image')
+
+    Thymio_marker, goal_marker = visio.get_2_markers(top_view_img)
+    robot_position, theta = visio.detect_thymio_pose(Thymio_marker)
+    goal_position = visio.detect_goal_position(goal_marker)
 
 
-    #use the transform from original image to warped image to transform all the corresponding points and display them
-    #on the map. 
-    new_thymio = four_point_matrix @ thymio_pose
-    # new_thymio_angle = thymio_theta - (np.pi)/2
-    new_goal = (four_point_matrix @ goal_pos).astype('int32')
-    top_view_img = cv2.circle(top_view_img, new_goal[:2], 20, (0,255,0), 5)
-    start = np.array(new_thymio[:2]).astype(int)
-    end = (int(start[0] + arrow_length*np.cos(thymio_theta)), int(start[1] + arrow_length*np.sin(thymio_theta)))
-    top_view_img = cv2.arrowedLine(top_view_img,start, end, (255,0,0), 20) #the angle should be off
-    show_img(top_view_img, 'top view')
+    arrow_length = 500
+    # Calculate the end point of the arrow using the angle theta
+    end_x = int(robot_position[0] + arrow_length * np.cos(theta))
+    end_y = int(robot_position[1] - arrow_length * np.sin(theta))
+    top_view_img = cv2.arrowedLine(top_view_img, robot_position, (end_x, end_y), (0, 0, 255), 5)
+    top_view_img = cv2.arrowedLine(top_view_img, robot_position, goal_position, (255, 0, 0), 20)
 
+    show_img(top_view_img, 'Opps, baby')
    
