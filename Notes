@@ -18,7 +18,10 @@ Notes about Navigation:
 Notes about Filtering:
 
 Notes about Motion Control:
-
+To go from Thymio speed to mm/s, the conversion factor = 0.41666666666666663
+The speed variance in mm^2/s^2 = 79.04287646849414
+The speed state variance in mm^2/s^2 = 39.52
+The speed measurement variance in mm^2/s^2 = 39.52
 
 
 
