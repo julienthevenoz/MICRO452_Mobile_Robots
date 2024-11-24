@@ -19,7 +19,7 @@ import numpy as np
 #LOWER_BROWN = np.array([0,0,0])
 
 MIN_AREA = 80
-DIST_THRESHOLD = 30
+DIST_THRESHOLD = 10
 
 
 def show_img(img,title):
@@ -106,41 +106,39 @@ class Vision_module():
         threshold : distance maximale pour considérer deux points comme proches.
         """
         merged = []
-
+    
         for polygon in obstacle_corners:
             added = False
-
             for merged_polygon in merged:
                 # Vérifiez si le polygone actuel est proche de l'un des polygones fusionnés
                 for point in polygon:
-                    if any(np.linalg.norm(np.array(point) - np.array(merged_point)) < threshold 
+                    if any(self.distance(point, merged_point) < threshold 
                            for merged_point in merged_polygon):
                         # Si oui, fusionnez les coins
                         merged_polygon.extend(polygon)
                         added = True
                         break
-
                 if added:
                     break
-
+                
             if not added:
                 # Si le polygone n'est pas proche d'un polygone fusionné existant, ajoutez-le tel quel
                 merged.append(list(polygon))
-
+    
         # Nettoyez les doublons dans les points fusionnés
         merged_cleaned = []
         for merged_polygon in merged:
             cleaned = []
             for point in merged_polygon:
-                if not any(np.linalg.norm(np.array(point) - np.array(existing_point)) < threshold 
+                if not any(self.distance(point, existing_point) < threshold 
                            for existing_point in cleaned):
                     cleaned.append(point)
             merged_cleaned.append(cleaned)
-
+    
         return merged_cleaned
 
 
-    def detect_obstacle_corners(self, img):
+    def detect_obstacle_corners(self, img, DIST_THRESHOLD=10, MIN_AREA=500):
         """
         Détecte les bords des obstacles dans l'image, les approxime par des polygones,
         et garde uniquement ceux dont la couleur moyenne est noire (obstacles).
@@ -167,53 +165,71 @@ class Vision_module():
         img_with_polygons = img.copy()
 
         # 8. Plage de teinte pour le noir (en HSV)
-        lower_black_hsv = np.array([0, 0, 30])  #0, 0, 30
-        upper_black_hsv = np.array([179, 140, 120])  # Ajustez selon vos besoins #179, 140, 120
+        lower_black_hsv = np.array([0, 0, 30])  # Ajustez selon vos besoins
+        upper_black_hsv = np.array([179, 140, 120])
 
         # 9. Parcourir chaque contour trouvé
+        approx_img = img.copy()  # Image pour visualiser l'approximation des polygones
         for contour in contours:
             # Approximation du contour par un polygone
             epsilon = 0.02 * cv2.arcLength(contour, True)  # Précision de l'approximation
             approx = cv2.approxPolyDP(contour, epsilon, True)
 
-            area = cv2.contourArea(contour)
-            if area < MIN_AREA:
-                continue  # Ignorer ce polygone et passer au suivant
+            # Générer une couleur aléatoire pour chaque polygone
+            color = np.random.randint(0, 256, 3).tolist()  # Couleur aléatoire (BGR)
 
-            # Créer un masque pour extraire l'intérieur du polygone
-            mask = np.zeros_like(hsv_img[:, :, 0])  # Masque pour la teinte (H)
-            cv2.drawContours(mask, [approx], -1, (255), thickness=cv2.FILLED)
+            # Dessiner les coins du polygone
+            for (x, y) in approx.reshape(-1, 2):  # Dessiner les coins
+                cv2.circle(approx_img, (x, y), 5, (0, 0, 255), -1)  # Coins en rouge
+            cv2.drawContours(approx_img, [approx], -1, color, 2)  # Dessiner les polygones en bleu
+            obstacle_corners.append(approx.reshape(-1, 2).tolist())
 
-            # Calcul de la moyenne des couleurs à l'intérieur du polygone en HSV
-            mean_color_hsv = cv2.mean(hsv_img, mask=mask)  # Retourne (H, S, V, alpha)
-
-            # Si la teinte est proche de celle du noir, on garde le polygone
-            if ((lower_black_hsv[0] <= mean_color_hsv[0] <= upper_black_hsv[0]) and 
-                (lower_black_hsv[1] <= mean_color_hsv[1] <= upper_black_hsv[1]) and 
-                (lower_black_hsv[2] <= mean_color_hsv[2] <= upper_black_hsv[2])):
-
-                # Ajouter les coins du polygone à la liste
-                obstacle_corners.append(approx.reshape(-1, 2).tolist())
+        # Affichage intermédiaire de l'approximation des polygones
+        show_many_img([approx_img], ["Polygones avant fusion"])
 
         # 10. Fusionner les polygones proches
         obstacle_corners = self.merge_polygons(obstacle_corners, DIST_THRESHOLD)
 
-        # 11. Dessiner les polygones fusionnés sur l'image
+        # Affichage après fusion des polygones
+        merged_img = img.copy()
         for polygon in obstacle_corners:
-            polygon_array = np.array(polygon, dtype=np.int32)  # Convertir en format attendu par OpenCV
+            polygon_array = np.array(polygon, dtype=np.int32)
             color = np.random.randint(0, 256, 3).tolist()  # Couleur aléatoire pour chaque polygone
-            cv2.drawContours(img_with_polygons, [polygon_array], -1, color, 2)  # Dessiner le contour
+            cv2.drawContours(merged_img, [polygon_array], -1, color, 2)  # Dessiner les polygones fusionnés
             for (x, y) in polygon:
-                cv2.circle(img_with_polygons, (x, y), 5, (0, 0, 255), -1)  # Dessiner les coins en rouge
+                cv2.circle(merged_img, (x, y), 5, (0, 0, 255), -1)  # Coins en rouge
 
-        # 12. Afficher les coins des polygones fusionnés
-        for idx, corners in enumerate(obstacle_corners):
-            print(f"Polygone {idx + 1}: Nombre de coins = {len(corners)}")
-            for corner in corners:
-                print(f"  Coin: ({corner[0]}, {corner[1]})")
+        show_many_img([merged_img], ["Polygones après fusion"])
 
-        # 13. Retourner les coins des polygones et l'image avec les polygones dessinés
-        return obstacle_corners, img_with_polygons
+        # 11. Calculer la moyenne des couleurs à l'intérieur des polygones et filtrer par couleur
+        final_polygons = []
+        for polygon in obstacle_corners:
+            # Créer un masque pour extraire l'intérieur du polygone
+            mask = np.zeros_like(hsv_img[:, :, 0])
+            cv2.drawContours(mask, [np.array(polygon, dtype=np.int32)], -1, (255), thickness=cv2.FILLED)
+
+            # Calcul de la moyenne des couleurs à l'intérieur du polygone en HSV
+            mean_color_hsv = cv2.mean(hsv_img, mask=mask)
+
+            # Filtrer en fonction de la couleur noire
+            if ((lower_black_hsv[0] <= mean_color_hsv[0] <= upper_black_hsv[0]) and 
+                (lower_black_hsv[1] <= mean_color_hsv[1] <= upper_black_hsv[1]) and 
+                (lower_black_hsv[2] <= mean_color_hsv[2] <= upper_black_hsv[2])):
+                final_polygons.append(polygon)
+
+        # 12. Affichage final avec les polygones filtrés
+        final_img = img.copy()
+        for polygon in final_polygons:
+            polygon_array = np.array(polygon, dtype=np.int32)
+            color = np.random.randint(0, 256, 3).tolist()  # Couleur aléatoire pour chaque polygone
+            cv2.drawContours(final_img, [polygon_array], -1, color, 2)
+            for (x, y) in polygon:
+                cv2.circle(final_img, (x, y), 5, (0, 0, 255), -1)
+
+        # Affichage final
+        show_many_img([final_img], ["Polygones filtrés"])
+
+        return final_polygons, final_img
     
     def modify_image_for_visualization(self, img, obstacle_corners, tymio_position, tymio_radius=40):
         """
@@ -440,7 +456,7 @@ class Vision_module():
         return 
 
 if __name__ == "__main__":
-    filename = 'Photos/tymio_islands_resised_no_boats.jpg'
+    filename = 'Photos/tymio_islands_resised.jpg'
 
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
     # Vérifier si l'image est correctement chargée
