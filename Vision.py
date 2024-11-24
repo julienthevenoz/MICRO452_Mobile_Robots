@@ -19,7 +19,7 @@ import numpy as np
 #LOWER_BROWN = np.array([0,0,0])
 
 MIN_AREA = 80
-DIST_THRESHOLD = 10
+DIST_THRESHOLD = 30
 
 
 def show_img(img,title):
@@ -167,8 +167,8 @@ class Vision_module():
         img_with_polygons = img.copy()
 
         # 8. Plage de teinte pour le noir (en HSV)
-        lower_black_hsv = np.array([0, 0, 30])
-        upper_black_hsv = np.array([179, 120, 120])  # Ajustez selon vos besoins
+        lower_black_hsv = np.array([0, 0, 30])  #0, 0, 30
+        upper_black_hsv = np.array([179, 140, 120])  # Ajustez selon vos besoins #179, 140, 120
 
         # 9. Parcourir chaque contour trouvé
         for contour in contours:
