@@ -1,8 +1,8 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans ##### librairie pour le K-mean, le PCA,... #####
+#import matplotlib.pyplot as plt
+#from sklearn.decomposition import PCA
+#from sklearn.cluster import KMeans ##### librairie pour le K-mean, le PCA,... #####
 
 
 ##### interet de faire une class Vision_Thymio #####
@@ -12,11 +12,14 @@ from sklearn.cluster import KMeans ##### librairie pour le K-mean, le PCA,... ##
 # Camera & Image Processing
 #Magic numbers
 #NB : opencv uses convention of [0,179], [0,255] and [0,255] for HSV values instead of the common [0,360],[0,100], [0,100]
-UPPER_GREEN = np.array([120,255,255], dtype='uint8')    
-LOWER_GREEN = np.array([70,0,0], dtype='uint8')
+#UPPER_GREEN = np.array([120,255,255], dtype='uint8')    
+#LOWER_GREEN = np.array([70,0,0], dtype='uint8')
 
-UPPER_BROWN = np.array([60,255,255])
-LOWER_BROWN = np.array([0,0,0])
+#UPPER_BROWN = np.array([60,255,255])
+#LOWER_BROWN = np.array([0,0,0])
+
+MIN_AREA = 80
+DIST_THRESHOLD = 30
 
 
 def show_img(img,title):
@@ -61,12 +64,12 @@ class Vision_module():
     
     # Map definition
 
-    def Image_correction(image): # distortions or perspective distortions, definition des bords et coin. Crop les bords de l'image
+    #def Image_correction(image): # distortions or perspective distortions, definition des bords et coin. Crop les bords de l'image
         return
     
     ##### https://evergreenllc2020.medium.com/building-document-scanner-with-opencv-and-python-2306ee65c3db #####
     
-    def extract_edge(self, img): ##### à merge/repmplacer par Image_correction #####
+    #def extract_edge(self, img): ##### à merge/repmplacer par Image_correction #####
         # img = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
         show_img(img,'supposedly masked image')
         gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
@@ -92,7 +95,157 @@ class Vision_module():
         show_img(drawing,'Contours')
         return contours
 
-    def get_colour_mask(self, img, lower, upper):
+    def distance(self, p1, p2):
+        """Calcul de la distance euclidienne entre deux points"""
+        return np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
+    
+    def merge_polygons(self, obstacle_corners, threshold=10):
+        """
+        Fusionne des polygones dont les coins sont proches.
+        obstacle_corners : liste des coins des polygones.
+        threshold : distance maximale pour considérer deux points comme proches.
+        """
+        merged = []
+
+        for polygon in obstacle_corners:
+            added = False
+
+            for merged_polygon in merged:
+                # Vérifiez si le polygone actuel est proche de l'un des polygones fusionnés
+                for point in polygon:
+                    if any(np.linalg.norm(np.array(point) - np.array(merged_point)) < threshold 
+                           for merged_point in merged_polygon):
+                        # Si oui, fusionnez les coins
+                        merged_polygon.extend(polygon)
+                        added = True
+                        break
+
+                if added:
+                    break
+
+            if not added:
+                # Si le polygone n'est pas proche d'un polygone fusionné existant, ajoutez-le tel quel
+                merged.append(list(polygon))
+
+        # Nettoyez les doublons dans les points fusionnés
+        merged_cleaned = []
+        for merged_polygon in merged:
+            cleaned = []
+            for point in merged_polygon:
+                if not any(np.linalg.norm(np.array(point) - np.array(existing_point)) < threshold 
+                           for existing_point in cleaned):
+                    cleaned.append(point)
+            merged_cleaned.append(cleaned)
+
+        return merged_cleaned
+
+
+    def detect_obstacle_corners(self, img):
+        """
+        Détecte les bords des obstacles dans l'image, les approxime par des polygones,
+        et garde uniquement ceux dont la couleur moyenne est noire (obstacles).
+        """
+        # 1. Conversion de l'image en HSV pour une analyse des couleurs
+        hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+        # 2. Conversion de l'image en niveaux de gris
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # 3. Application d'un flou pour réduire le bruit
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+
+        # 4. Détection des bords avec Canny
+        edges = cv2.Canny(blurred, threshold1=150, threshold2=200)
+
+        # 5. Trouver les contours dans l'image avec la méthode findContours
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # 6. Liste pour stocker les coins des obstacles
+        obstacle_corners = []
+
+        # 7. Image pour visualiser les polygones détectés
+        img_with_polygons = img.copy()
+
+        # 8. Plage de teinte pour le noir (en HSV)
+        lower_black_hsv = np.array([0, 0, 30])  #0, 0, 30
+        upper_black_hsv = np.array([179, 140, 120])  # Ajustez selon vos besoins #179, 140, 120
+
+        # 9. Parcourir chaque contour trouvé
+        for contour in contours:
+            # Approximation du contour par un polygone
+            epsilon = 0.02 * cv2.arcLength(contour, True)  # Précision de l'approximation
+            approx = cv2.approxPolyDP(contour, epsilon, True)
+
+            area = cv2.contourArea(contour)
+            if area < MIN_AREA:
+                continue  # Ignorer ce polygone et passer au suivant
+
+            # Créer un masque pour extraire l'intérieur du polygone
+            mask = np.zeros_like(hsv_img[:, :, 0])  # Masque pour la teinte (H)
+            cv2.drawContours(mask, [approx], -1, (255), thickness=cv2.FILLED)
+
+            # Calcul de la moyenne des couleurs à l'intérieur du polygone en HSV
+            mean_color_hsv = cv2.mean(hsv_img, mask=mask)  # Retourne (H, S, V, alpha)
+
+            # Si la teinte est proche de celle du noir, on garde le polygone
+            if ((lower_black_hsv[0] <= mean_color_hsv[0] <= upper_black_hsv[0]) and 
+                (lower_black_hsv[1] <= mean_color_hsv[1] <= upper_black_hsv[1]) and 
+                (lower_black_hsv[2] <= mean_color_hsv[2] <= upper_black_hsv[2])):
+
+                # Ajouter les coins du polygone à la liste
+                obstacle_corners.append(approx.reshape(-1, 2).tolist())
+
+        # 10. Fusionner les polygones proches
+        obstacle_corners = self.merge_polygons(obstacle_corners, DIST_THRESHOLD)
+
+        # 11. Dessiner les polygones fusionnés sur l'image
+        for polygon in obstacle_corners:
+            polygon_array = np.array(polygon, dtype=np.int32)  # Convertir en format attendu par OpenCV
+            color = np.random.randint(0, 256, 3).tolist()  # Couleur aléatoire pour chaque polygone
+            cv2.drawContours(img_with_polygons, [polygon_array], -1, color, 2)  # Dessiner le contour
+            for (x, y) in polygon:
+                cv2.circle(img_with_polygons, (x, y), 5, (0, 0, 255), -1)  # Dessiner les coins en rouge
+
+        # 12. Afficher les coins des polygones fusionnés
+        for idx, corners in enumerate(obstacle_corners):
+            print(f"Polygone {idx + 1}: Nombre de coins = {len(corners)}")
+            for corner in corners:
+                print(f"  Coin: ({corner[0]}, {corner[1]})")
+
+        # 13. Retourner les coins des polygones et l'image avec les polygones dessinés
+        return obstacle_corners, img_with_polygons
+    
+    def modify_image_for_visualization(self, img, obstacle_corners, tymio_position, tymio_radius=40):
+        """
+        Modifie l'image en mettant le fond en bleu, les obstacles en noir, et le Tymio en blanc.
+        
+        :param img: L'image originale.
+        :param obstacle_corners: Liste des coins des polygones représentant les obstacles.
+        :param tymio_position: Position du Tymio dans l'image (x, y).
+        :param tymio_radius: Rayon approximatif du Tymio pour dessiner un cercle autour de lui.
+        :return: L'image modifiée.
+        """
+        # Vérifier si l'image a été correctement chargée
+        if img is None:
+            raise ValueError("L'image n'a pas pu être chargée. Veuillez vérifier le chemin du fichier.")
+    
+        # Créer une image bleue (fond bleu)
+        modified_img = np.zeros_like(img)  # Créer une image de la même taille que 'img'
+        modified_img[:, :] = (220, 220, 0)  # Bleu en BGR
+        
+        # Dessiner les obstacles en noir (polygones définis par obstacle_corners)
+        for corners in obstacle_corners:
+            # Convertir les coins en array numpy et dessiner chaque polygone
+            poly_points = np.array(corners, np.int32)
+            poly_points = poly_points.reshape((-1, 1, 2))
+            cv2.fillPoly(modified_img, [poly_points], (0, 0, 0))  # Noir pour les obstacles
+        
+        # Dessiner le Tymio en blanc (cercle autour de la position du Tymio)
+        cv2.circle(modified_img, tymio_position, tymio_radius, (255, 255, 255), -1)  # Blanc pour le Tymio
+        
+        return modified_img
+
+    #def get_colour_mask(self, img, lower, upper):
         original = img.copy()
         img = cv2.GaussianBlur(img, (5, 5), 0)  #apply gaussian smoothing
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)   #transform to Hue(=color)-Saturation-Value(=brightness) format to make color detection easier
@@ -100,7 +253,7 @@ class Vision_module():
         # show_img(mask,"mask")
         return mask
     
-    def color_segmentation(self, img):
+    #def color_segmentation(self, img):
         """
         Segmente l'image en fonction des couleurs spécifiques : noir, blanc, et bleu (mer).
         """
@@ -134,7 +287,7 @@ class Vision_module():
 
         return result_img
 
-    def kmeans_color_segmentation(self, img, n_clusters=3):
+    #def kmeans_color_segmentation(self, img, n_clusters=3):
         """
         Segmente l'image en utilisant K-means clustering pour détecter les couleurs principales.
         - Blanc (Thymio)
@@ -178,9 +331,7 @@ class Vision_module():
 
         return result_img, labels
 
-
-
-    def find_map_corners(self, contours):
+    #def find_map_corners(self, contours):
         #we sort our contours by area, in descending order, and we only need to keep first 5
         # of them since we're looking for a very big object (the map)
 
@@ -212,7 +363,7 @@ class Vision_module():
             print("no 4 corner contour")
             return None
 
-    def order_points(self,pts):
+    #def order_points(self,pts):
         '''Takes an input vector of points (=size 4x2) representing 
         the 4 corners of a rectangle and returns the same points re-ordered
         as : Top-right, Top-left, Bottom-left, Bottom-right
@@ -232,7 +383,7 @@ class Vision_module():
         # return the ordered coordinates
         return rect
     
-    def four_point_transform(self, image, pts):
+    #def four_point_transform(self, image, pts):
         # obtain a consistent order of the points and unpack them
         # individually''
         rect = self.order_points(pts)
@@ -265,7 +416,7 @@ class Vision_module():
         # return the warped image
         return warped
 
-    def detect_aruco(sel, img):
+    #def detect_aruco(sel, img):
         #convert to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
@@ -276,35 +427,53 @@ class Vision_module():
 
         pass
 
-    def detect_thymio_position(image):
+    #def detect_thymio_position(image):
         return
 
-    def detect_goal_position(image):
+    #def detect_goal_position(image):
         return
 
-    def detect_obstacles(image):    #def les bords des obstacles
+    #def detect_obstacles(image):    #def les bords des obstacles
         return
 
-    def map_rescaling (self):   #### a definir ou on le met exactement 
+    #def map_rescaling (self):   #### a definir ou on le met exactement 
         return 
 
 if __name__ == "__main__":
     filename = 'Photos/tymio_islands_resised_no_boats.jpg'
 
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
-    visio = Vision_module(img)
+    # Vérifier si l'image est correctement chargée
+    if img is None:
+        print("Erreur lors du chargement de l'image")
+        exit()
 
-    show_img(img, "Original Image")
+    # Créer une instance de Vision_module
+    visio = Vision_module()
+
+    # Appeler la méthode pour détecter les coins des obstacles
+    obstacle_corners, img_with_polygons = visio.detect_obstacle_corners(img)
+    
+    # Optionnellement, afficher l'image finale avec les polygones détectés
+    cv2.imshow("Polygones et coins", img_with_polygons)
+    cv2.waitKey(0)
+
+     ##### FUN #####
+    modified_img = visio.modify_image_for_visualization(img_with_polygons, obstacle_corners, (210,520)) ##### METTRE LES BON COORDONNEE DU TYMIO #####
+    cv2.imshow("Modified Image", modified_img)
+    cv2.waitKey(0)
+
+    cv2.destroyAllWindows()
     
     #mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
     #masked_img = cv2.bitwise_and(img, img, mask=mask)  # apply color mask (keep only green pixels)
 
     #Thresholding
-    segmented_img = visio.color_segmentation(img)
+    # segmented_img = visio.color_segmentation(img)
     # K-means segmentation
     #segmented_img, labels = visio.kmeans_color_segmentation(thresholded_img, n_clusters=3)
 
-    show_img(segmented_img, "Filtered Image")
+    #show_img(segmented_img, "Filtered Image")
 
     # Commented out parts for top-view transformation
     # contours = visio.extract_edge(img)
