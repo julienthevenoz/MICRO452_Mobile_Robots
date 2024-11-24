@@ -334,30 +334,13 @@ class Vision_module():
         #     highlighted_corners = cv2.circle(img,corners[i], 20, colors[i],4) #this is just for debugging
         show_img(highlighted_corners,title)
 
-    # def missing_corner(self,ids,markers):
-    #     if ids == (0,1,2,3) or ids == (0,1,2,3,4) or ids==(0,1,2,3,4,5):
-    #         print("all corners found")
-    #         return False
-    #     if 
-
 
 if __name__ == "__main__":
     filename = 'Photos/Photo7.jpg'
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
     visio = Vision_module(img)
 
-    # mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
-    # masked_img = cv2.bitwise_and(img, img, mask=mask)  #apply color mask (keep only green pixels)
-
-    # K-means segmentation
-    # corners, ids = visio.detect_aruco(img)
-    # segmented_img, labels = visio.kmeans_color_segmentation(img, n_clusters=3)
-
-    # contours = visio.extract_edge(img)
-    # corners = visio.find_map_corners(contours)
-    #now that we have the 4 corners of the map, we have to order them
-    # corners = visio.order_points(corners)
-    #now we can apply the transform to get a perpendicular top-view
+   
     markers, ids = visio.get_6_markers(img)
     corners = visio.get_map_corners(markers, ids)
     top_view_img, four_point_matrix = visio.four_point_transform(img,corners)
@@ -387,39 +370,4 @@ if __name__ == "__main__":
     top_view_img = cv2.arrowedLine(top_view_img,start, end, (255,0,0), 20) #the angle should be off
     show_img(top_view_img, 'top view')
 
-    # ###convert everything to map scale
-    # pts = visio.rescale_points([*corners, thymio_pose[:2], goal_pos])
-    # *r_corners, r_thymio, r_goal = pts
-    # r_goal = np.array(r_goal).astype(int)
-    # top_view_img = cv2.circle(top_view_img, r_goal, 20, (0,255,0), 5)
-    # print(0)
-
-    # import time
-    # visio = Vision_module()
-
-    # visio.initialize_camera(cam_port=4)
-    # rslt,img = visio.capture_image()
-    
-    # if rslt:
-    #     print("yes")
-    #     markers = visio.get_6_markers(img)
-    #     corners = visio.get_map_corners(markers)
-    #     top_view_img, four_point_matrix = visio.four_point_transform(img,corners)
-    #     print(corners)
-    # else:
-    #     print("fail")
-
-
-    # while True:
-    #     rslt,img = visio.capture_image()
-    #     if rslt:
-    #         visio.img = img
-    #         what = visio.get_6_markers(img)
-    #         markers, ids = visio.get_6_markers(img)
-    #         corners = visio.get_map_corners(markers, ids)
-    #         cv2.imshow(img)
-    #         cv2.waitKey(2000)
-    #         cv2.destroyAllWindows()
-
-    #     else:
-    #         time.sleep(1000)
+   
