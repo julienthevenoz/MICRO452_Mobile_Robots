@@ -214,6 +214,36 @@ class Vision_module():
 
         # 13. Retourner les coins des polygones et l'image avec les polygones dessinés
         return obstacle_corners, img_with_polygons
+    
+    def modify_image_for_visualization(self, img, obstacle_corners, tymio_position, tymio_radius=40):
+        """
+        Modifie l'image en mettant le fond en bleu, les obstacles en noir, et le Tymio en blanc.
+        
+        :param img: L'image originale.
+        :param obstacle_corners: Liste des coins des polygones représentant les obstacles.
+        :param tymio_position: Position du Tymio dans l'image (x, y).
+        :param tymio_radius: Rayon approximatif du Tymio pour dessiner un cercle autour de lui.
+        :return: L'image modifiée.
+        """
+        # Vérifier si l'image a été correctement chargée
+        if img is None:
+            raise ValueError("L'image n'a pas pu être chargée. Veuillez vérifier le chemin du fichier.")
+    
+        # Créer une image bleue (fond bleu)
+        modified_img = np.zeros_like(img)  # Créer une image de la même taille que 'img'
+        modified_img[:, :] = (220, 220, 0)  # Bleu en BGR
+        
+        # Dessiner les obstacles en noir (polygones définis par obstacle_corners)
+        for corners in obstacle_corners:
+            # Convertir les coins en array numpy et dessiner chaque polygone
+            poly_points = np.array(corners, np.int32)
+            poly_points = poly_points.reshape((-1, 1, 2))
+            cv2.fillPoly(modified_img, [poly_points], (0, 0, 0))  # Noir pour les obstacles
+        
+        # Dessiner le Tymio en blanc (cercle autour de la position du Tymio)
+        cv2.circle(modified_img, tymio_position, tymio_radius, (255, 255, 255), -1)  # Blanc pour le Tymio
+        
+        return modified_img
 
     #def get_colour_mask(self, img, lower, upper):
         original = img.copy()
@@ -423,10 +453,16 @@ if __name__ == "__main__":
 
     # Appeler la méthode pour détecter les coins des obstacles
     obstacle_corners, img_with_polygons = visio.detect_obstacle_corners(img)
-
+    
     # Optionnellement, afficher l'image finale avec les polygones détectés
     cv2.imshow("Polygones et coins", img_with_polygons)
     cv2.waitKey(0)
+
+     ##### FUN #####
+    modified_img = visio.modify_image_for_visualization(img_with_polygons, obstacle_corners, (210,520)) ##### METTRE LES BON COORDONNEE DU TYMIO #####
+    cv2.imshow("Modified Image", modified_img)
+    cv2.waitKey(0)
+
     cv2.destroyAllWindows()
     
     #mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
