@@ -241,7 +241,7 @@ class Vision_module():
             cv2.fillPoly(modified_img, [poly_points], (0, 0, 0))  # Noir pour les obstacles
         
         # Dessiner le Tymio en blanc (cercle autour de la position du Tymio)
-        cv2.circle(modified_img, tymio_position, tymio_radius, (255, 255, 255), -1)  # Blanc pour le Tymio
+        #cv2.circle(modified_img, tymio_position, tymio_radius, (255, 255, 255), -1)  # Blanc pour le Tymio
         
         return modified_img
 
