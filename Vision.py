@@ -1,10 +1,8 @@
 import cv2
 import numpy as np
 
-
 MIN_AREA = 10
 DIST_THRESHOLD = 10
-
 
 def show_img(img,title):
     cv2.namedWindow(title, cv2.WINDOW_NORMAL)
@@ -141,7 +139,7 @@ class Vision_module():
             obstacle_corners.append(approx.reshape(-1, 2).tolist())
 
         # Affichage intermédiaire de l'approximation des polygones
-        show_many_img([approx_img], ["Polygones avant fusion"])
+        #show_many_img([approx_img], ["Polygones avant fusion"])
 
         # 10. Fusionner les polygones proches
         obstacle_corners = self.merge_polygons(obstacle_corners, DIST_THRESHOLD)
@@ -155,7 +153,7 @@ class Vision_module():
             for (x, y) in polygon:
                 cv2.circle(merged_img, (x, y), 5, (0, 0, 255), -1)  # Coins en rouge
 
-        show_many_img([merged_img], ["Polygones après fusion"])
+        #show_many_img([merged_img], ["Polygones après fusion"])
 
         # 11. Calculer la moyenne des couleurs à l'intérieur des polygones et filtrer par couleur
         final_polygons = []
@@ -193,7 +191,7 @@ class Vision_module():
                 cv2.circle(final_img, (x, y), 5, (0, 0, 255), -1)
 
         # Affichage final
-        show_many_img([final_img], ["Polygones filtrés"])
+        #show_many_img([final_img], ["Polygones filtrés"])
 
         return final_polygons, final_img
 
@@ -248,9 +246,9 @@ if __name__ == "__main__":
     cv2.waitKey(0)
 
      ##### FUN #####
-    modified_img = visio.modify_image_for_visualization(img_with_polygons, obstacle_corners, (210,520)) ##### METTRE LES BON COORDONNEE DU TYMIO #####
-    cv2.imshow("Modified Image", modified_img)
-    cv2.waitKey(0)
+    #modified_img = visio.modify_image_for_visualization(img_with_polygons, obstacle_corners, (210,520)) ##### METTRE LES BON COORDONNEE DU TYMIO #####
+    #cv2.imshow("Modified Image", modified_img)
+    #cv2.waitKey(0)
 
     cv2.destroyAllWindows()
 
