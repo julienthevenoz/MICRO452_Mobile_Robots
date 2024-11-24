@@ -1,128 +1,110 @@
 import cv2
+import threading
+import time
 import numpy as np
-
-MIN_AREA = 10
-DIST_THRESHOLD = 10
 
 
 class VisionModule:
+    """Module de gestion de la caméra"""
     def __init__(self):
         self.cam = None
+        self.frame = None
 
-    def initialize_camera(self, cam_port=0):  # Par défaut, port 0
+    def initialize_camera(self, cam_port=0):
         self.cam = cv2.VideoCapture(cam_port)
         if not self.cam.isOpened():
-            raise Exception("Impossible d'ouvrir la caméra.")
+            print(f"Impossible d'ouvrir la caméra sur le port {cam_port}")
+            return False
+        print(f"Caméra initialisée sur le port {cam_port}")
+        return True
 
-    def distance(self, p1, p2):
-        """Calcul de la distance euclidienne entre deux points."""
-        return np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
+    def capture_frame(self):
+        if not self.cam or not self.cam.isOpened():
+            print("La caméra n'est pas initialisée.")
+            return None
 
-    def merge_polygons(self, obstacle_corners, threshold=10):
+        ret, frame = self.cam.read()
+        if not ret:
+            print("Échec de la capture d'image.")
+            return None
+
+        self.frame = frame
+        return frame
+    
+    def analyze_frame(self, frame):
         """
-        Fusionne des polygones dont les coins sont proches.
+        Analyse l'image : dans cet exemple, on détecte les contours.
+        Vous pouvez remplacer cette fonction par votre propre code d'analyse.
         """
-        merged = []
-        for polygon in obstacle_corners:
-            added = False
-            for merged_polygon in merged:
-                for point in polygon:
-                    if any(self.distance(point, merged_point) < threshold for merged_point in merged_polygon):
-                        merged_polygon.extend(polygon)
-                        added = True
-                        break
-                if added:
-                    break
-            if not added:
-                merged.append(list(polygon))
+        # Conversion en niveaux de gris
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # Nettoyage des doublons
-        merged_cleaned = []
-        for merged_polygon in merged:
-            cleaned = []
-            for point in merged_polygon:
-                if not any(self.distance(point, existing_point) < threshold for existing_point in cleaned):
-                    cleaned.append(point)
-            if len(cleaned) > 2:
-                cleaned = cv2.convexHull(np.array(cleaned, dtype=np.int32)).reshape(-1, 2).tolist()
-            merged_cleaned.append(cleaned)
-
-        return merged_cleaned
-
-    def detect_obstacle_corners(self, img):
-        """
-        Détecte les obstacles dans l'image.
-        """
-        hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # Application d'un flou pour réduire le bruit
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        edges = cv2.Canny(blurred, threshold1=150, threshold2=200)
-        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        obstacle_corners = []
-        lower_black_hsv = np.array([0, 80, 20])
-        upper_black_hsv = np.array([179, 150, 120])
+        # Détection des contours avec Canny
+        edges = cv2.Canny(blurred, threshold1=100, threshold2=200)
 
-        for contour in contours:
-            epsilon = 0.02 * cv2.arcLength(contour, True)
-            approx = cv2.approxPolyDP(contour, epsilon, True)
-            obstacle_corners.append(approx.reshape(-1, 2).tolist())
+        # Convertir les bords en image couleur pour affichage
+        edges_colored = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+        
+        # Retourner l'image avec analyse (ici, les contours)
+        return edges_colored
 
-        # Fusionner les polygones proches
-        obstacle_corners = self.merge_polygons(obstacle_corners, DIST_THRESHOLD)
+    def release_camera(self):
+        if self.cam:
+            self.cam.release()
+        cv2.destroyAllWindows()
 
-        final_polygons = []
-        for polygon in obstacle_corners:
-            mask = np.zeros_like(hsv_img[:, :, 0])
-            cv2.drawContours(mask, [np.array(polygon, dtype=np.int32)], -1, (255), thickness=cv2.FILLED)
 
-            polygon_array = np.array(polygon, dtype=np.int32)
-            area = cv2.contourArea(polygon_array)
-            if area < MIN_AREA:
-                continue
+class CameraFeedThread(threading.Thread):
+    """Thread pour capturer et afficher un flux vidéo constant"""
+    def __init__(self, vision_module):
+        super().__init__()
+        self.vision_module = vision_module
+        self.stop_event = threading.Event()
 
-            mean_color_hsv = cv2.mean(hsv_img, mask=mask)
-            if ((lower_black_hsv[0] <= mean_color_hsv[0] <= upper_black_hsv[0]) and
-                (lower_black_hsv[1] <= mean_color_hsv[1] <= upper_black_hsv[1]) and
-                (lower_black_hsv[2] <= mean_color_hsv[2] <= upper_black_hsv[2])):
-                final_polygons.append(polygon)
+    def run(self):
+        while not self.stop_event.is_set():
+            frame = self.vision_module.capture_frame()
+            if frame is not None:
+                # Utilisation de la méthode d'analyse de VisionModule
+                processed_frame = self.vision_module.analyze_frame(frame)
 
-        return final_polygons
+                # Afficher l'image analysée
+                cv2.imshow("Camera Feed", processed_frame)
 
-    def draw_obstacles(self, img, obstacle_corners):
-        """
-        Dessine les obstacles détectés sur l'image.
-        """
-        for polygon in obstacle_corners:
-            polygon_array = np.array(polygon, dtype=np.int32)
-            color = (0, 255, 0)  # Vert pour les polygones
-            cv2.drawContours(img, [polygon_array], -1, color, 2)
-            for (x, y) in polygon:
-                cv2.circle(img, (x, y), 5, (0, 0, 255), -1)  # Coins en rouge
-        return img
+                # Quitter si la touche 'q' est pressée
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    self.stop()
+
+    def stop(self):
+        """Arrêter le thread et libérer la caméra"""
+        self.stop_event.set()
+        self.vision_module.release_camera()
 
 
 def main():
+    """Point d'entrée principal"""
     vision = VisionModule()
-    vision.initialize_camera(0)  # Initialiser la caméra (port 0)
+    if not vision.initialize_camera(cam_port=0):
+        print("Erreur : Impossible d'initialiser la caméra.")
+        return
+
+    camera_thread = CameraFeedThread(vision)
+    camera_thread.start()
 
     try:
         while True:
-            ret, frame = vision.cam.read()
-            if not ret:
-                print("Erreur lors de la capture vidéo.")
-                break
-
-            obstacle_corners = vision.detect_obstacle_corners(frame)
-            frame_with_obstacles = vision.draw_obstacles(frame, obstacle_corners)
-
-            cv2.imshow('Détection d\'obstacles', frame_with_obstacles)
-            if cv2.waitKey(1) & 0xFF == ord('q'):  # Appuyer sur 'q' pour quitter
-                break
-
+            # Vous pouvez exécuter d'autres tâches en parallèle ici
+            print("Le programme principal fonctionne en arrière-plan...")
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("Arrêt du programme demandé.")
     finally:
-        vision.cam.release()
-        cv2.destroyAllWindows()
+        camera_thread.stop()
+        camera_thread.join()
+        print("Programme terminé.")
 
 
 if __name__ == "__main__":
