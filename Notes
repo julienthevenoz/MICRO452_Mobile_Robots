@@ -29,3 +29,20 @@ The speed measurement variance in mm^2/s^2 = 39.52
 Personnal Reminders and notes
 [Julien] I took lines X to Y of file vision.py from this source : blablaa.com
 [Julien] I like trains
+
+
+
+GIT :
+To change branch (for example go to branch aruco_zhuoran)
+  git checkout aruco_zhuoran
+To get all the updates on the CLOUD/REMOTE git folder onto your own LOCAL git folder (do this regularly)
+  git pull
+
+To add the changes you just did to a file (first save the file lol):
+     git add name_of_file.py
+Then you can say to git "I'm sure I want to keep the changes on my own LOCAL GIT FOLDER" and add little messsage to remind yourself of what the changes were
+    git commit -m "hello, this is a comment, I can write anything here"
+Then when you want the others of the group to be able to see your changes, you can put them on the CLOUD/REMOTE git folder with
+    git push
+
+    
