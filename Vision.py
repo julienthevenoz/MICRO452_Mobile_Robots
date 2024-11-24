@@ -12,22 +12,31 @@ from sklearn.cluster import KMeans ##### librairie pour le K-mean, le PCA,... ##
 # Camera & Image Processing
 #Magic numbers
 #NB : opencv uses convention of [0,179], [0,255] and [0,255] for HSV values instead of the common [0,360],[0,100], [0,100]
-UPPER_GREEN = np.array([120,255,255], dtype='uint8')    
-LOWER_GREEN = np.array([70,0,0], dtype='uint8')
+# UPPER_GREEN = np.array([120,255,255], dtype='uint8')    
+# LOWER_GREEN = np.array([70,0,0], dtype='uint8')
 
-UPPER_BROWN = np.array([60,255,255])
-LOWER_BROWN = np.array([0,0,0])
+# UPPER_BROWN = np.array([60,255,255])
+# LOWER_BROWN = np.array([0,0,0])
 
 
-def show_img(img,title):
+# def show_img(img,title, wait_ms=1):
+#     cv2.namedWindow(title, cv2.WINDOW_NORMAL)
+#     cv2.imshow(title, img)
+#     while True: 
+#         if cv2.waitKey(wait_ms) & 255==ord('q'):  # Wait for a q press or window closed to close the window
+#             break
+#         if cv2.getWindowProperty(title, cv2.WND_PROP_VISIBLE) < 1:
+#             break
+#     cv2.destroyAllWindows()
+def show_img(img, title, wait_ms=1):
     cv2.namedWindow(title, cv2.WINDOW_NORMAL)
     cv2.imshow(title, img)
-    while True: 
-        if cv2.waitKey(1) & 255==ord('q'):  # Wait for a q press or window closed to close the window
-            break
-        if cv2.getWindowProperty(title, cv2.WND_PROP_VISIBLE) < 1:
-            break
-    cv2.destroyAllWindows()
+    # This allows the window to refresh without blocking the program
+    key = cv2.waitKey(wait_ms) & 0xFF
+    # Optionally handle 'q' to quit the display loop in the main program
+    if key == ord('q'):
+        return False
+    return True
 
 
 def show_many_img(img_list, title_list):
@@ -41,6 +50,22 @@ def show_many_img(img_list, title_list):
     cv2.waitKey(0)  # Wait for a key press to close the window
     cv2.destroyAllWindows()
 
+
+def squeeze(iterable,type=None):
+        '''Reduces the dimension of list,tuple or array and (optional) changes its datatype.
+        Always returns a numpy array of dimension 1 at mininum (no scalar)'''
+        #so for example if you a the list of tuples with useless dimensions [ [ [(a,b)] , [(a,b)] ] ]
+        #it returns the array [ [a,b] , [a,b] ]
+        array = np.array(iterable)
+        if type is not None:
+            array = array.astype(type)
+
+        if array.shape == (1,): #if array is of dim1, it should not be squeezed into dim0
+            return array
+        if array.shape == ():  #if array is of dim0, bring it up to dim1
+            return np.array([array])
+        
+        return array.squeeze()
 
 class Vision_module():
     def __init__(self, image=None, map_size=(1000,1000)):
@@ -58,7 +83,10 @@ class Vision_module():
 
     def capture_image(self):
         result, image = self.cam.read()
-        print(result)
+        print("Result : ",result)
+        if result:
+            self.img = image
+        # print(result)
         show_img(image, 'camera image')
         return result, image
     
@@ -219,7 +247,7 @@ class Vision_module():
             print("no markers")
 
         #we want to get rid of the tuple around the array, and the extra dimention it implies
-        markerCorners = np.array(markerCorners).squeeze() 
+        markerCorners = squeeze(markerCorners)#np.array(markerCorners).squeeze() 
         
         return markerCorners, markerIds
     
@@ -232,12 +260,12 @@ class Vision_module():
         if not(len(ids)==6):
             print(f"Detected {len(ids)} markers instead of 6")
             #exit(1)
-            return markers.squeeze(), ids.squeeze()
+            #return squeeze(markers), squeeze(ids) #markers.squeeze(), ids.squeeze()
         pairs = sorted(list(zip(ids,markers))) #make a list of corresponding [id,marker] pairs, then sort it
         ids, markers = zip(*pairs) #unzip the pairs : ids are now in order 0-5 and the corresponding aruco corner markers are in the same order
-        markers = np.array(markers).squeeze()  #get rid of the useless exterior array
-        ids = np.array(ids).squeeze()
-        return markers, ids
+        # markers = np.array(markers).squeeze()  #get rid of the useless exterior array
+        # ids = np.array(ids).squeeze()
+        return squeeze(markers), squeeze(ids)
         
     def get_map_corners(self,markers, ids):
         '''Gets the 4 corners of the map based on the marker positions'''
@@ -245,11 +273,14 @@ class Vision_module():
         #only keep the first 4 ones, corresponding to the corners
         markers = markers[:4]
         # corners_of_markers = []
-        for i in range(4):
+        for i in range(len(ids)):
             corner_id = ids[i]
-            if corner_id >= 4:  #markers 4 and 5 are not corners
-                break
-            center = self.find_marker_center_and_orientation(markers[corner_id])[:2]  #we only keep x and y, not theta
+            #if the current corner was not detected or if it's thymio/goal marker (4 and 5)
+            if not(corner_id in ids) or corner_id >= 4:  
+                continue
+            center = self.find_marker_center_and_orientation(markers[i])
+            center = center[:2]
+            # center = self.find_marker_center_and_orientation(markers[corner_id])[:2]  #we only keep x and y, not theta
             self.map_corners[corner_id,:] = center
             # corners_of_markers.append(center)
             # if corner_id == 0:
@@ -321,18 +352,31 @@ class Vision_module():
             rescaled_pts.append((rescaled_x, rescaled_y))
         return rescaled_pts
     
-    def highlight_corners(self, image, corners, title='highlighted corners'):
+    def highlight_corners(self, image, corners, title='highlighted corners', show=True):
+        '''Draws a circle around the corners detected in this iteration,
+        and a rectangle around the corners remebered/stored in self.map_corners '''
         img = image.copy()
-        corners = np.array(corners, dtype='int32').squeeze()
+        corners = squeeze(corners, type='int32') #np.array(corners, dtype='int32').squeeze()
         colors = [(0,0,255),(0,255,0),(255,0,0),(0,255,255)]  #red, green, blue, yellow
         for i,corner in enumerate(corners):
-            if corner[0] == -1:  #don't show corners which haven't been initialized
-                continue 
             highlighted_corners = cv2.circle(img,corner, 20, colors[i],4) #this is just for debugging
+        in_memory = 0
+        for stored_corner in self.map_corners:
+            if stored_corner[0] == -1:  #don't show corners which haven't been initialized
+                continue 
+            #for cv2.rectangle, you need to give the tl and br corners of the rectangle to draw
+            top_left = stored_corner + np.array([-25, -25])
+            bottom_right = stored_corner + np.array([25,25])
+            highlighted_corners = cv2.rectangle(highlighted_corners, top_left, bottom_right, (255,0,255)) #purple
+            in_memory += 1
+
         # for i in range(4):
         #     print(corners[i],colors[i])
         #     highlighted_corners = cv2.circle(img,corners[i], 20, colors[i],4) #this is just for debugging
-        show_img(highlighted_corners,title)
+        if show: 
+            show_img(highlighted_corners,"Corners : o = detected    [] = remembered")
+
+        print(f"{len(ids)} detected corners, {in_memory} corners stored")
 
     # def missing_corner(self,ids,markers):
     #     if ids == (0,1,2,3) or ids == (0,1,2,3,4) or ids==(0,1,2,3,4,5):
@@ -345,47 +389,41 @@ if __name__ == "__main__":
     filename = 'Photos/Photo7.jpg'
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
     visio = Vision_module(img)
-
-    # mask = visio.get_colour_mask(img, LOWER_GREEN, UPPER_GREEN)
-    # masked_img = cv2.bitwise_and(img, img, mask=mask)  #apply color mask (keep only green pixels)
-
-    # K-means segmentation
-    # corners, ids = visio.detect_aruco(img)
-    # segmented_img, labels = visio.kmeans_color_segmentation(img, n_clusters=3)
+    visio.initialize_camera(cam_port=5)
 
     # contours = visio.extract_edge(img)
     # corners = visio.find_map_corners(contours)
     #now that we have the 4 corners of the map, we have to order them
     # corners = visio.order_points(corners)
     #now we can apply the transform to get a perpendicular top-view
-    markers, ids = visio.get_6_markers(img)
-    corners = visio.get_map_corners(markers, ids)
-    top_view_img, four_point_matrix = visio.four_point_transform(img,corners)
-    thymio_pose, thymio_theta = visio.detect_thymio_pose(markers)
-    goal_pos = visio.detect_goal_position(markers)
-    #let's put a green circle on top of the goal
-    original_image = cv2.circle(img, goal_pos[:2], 20, (0,255,0), 5)
-    #let's draw an arrow from the center of the thymio in the direction where it's looking
-    arrow_length = 100 #in pixels
-    start = thymio_pose[:2]
-    end = (int(start[0] + arrow_length*np.cos(thymio_theta)), int(start[1] + arrow_length*np.sin(thymio_theta)))
-    # end = start + (arrow_length*np.cos(thymio_pose[2]),arrow_length*np.sin(thymio_pose[2]))
-    original_image = cv2.arrowedLine(original_image,start, end, (255,0,0), 20)
-    #let's put a green circle on top of the goal
-    original_image = cv2.circle(original_image, goal_pos[:2], 20, (0,255,0), 5)
-    show_img(original_image,'OG image')
+    # markers, ids = visio.get_6_markers(img)
+    # corners = visio.get_map_corners(markers, ids)
+    # top_view_img, four_point_matrix = visio.four_point_transform(img,corners)
+    # thymio_pose, thymio_theta = visio.detect_thymio_pose(markers)
+    # goal_pos = visio.detect_goal_position(markers)
+    # #let's put a green circle on top of the goal
+    # original_image = cv2.circle(img, goal_pos[:2], 20, (0,255,0), 5)
+    # #let's draw an arrow from the center of the thymio in the direction where it's looking
+    # arrow_length = 100 #in pixels
+    # start = thymio_pose[:2]
+    # end = (int(start[0] + arrow_length*np.cos(thymio_theta)), int(start[1] + arrow_length*np.sin(thymio_theta)))
+    # # end = start + (arrow_length*np.cos(thymio_pose[2]),arrow_length*np.sin(thymio_pose[2]))
+    # original_image = cv2.arrowedLine(original_image,start, end, (255,0,0), 20)
+    # #let's put a green circle on top of the goal
+    # original_image = cv2.circle(original_image, goal_pos[:2], 20, (0,255,0), 5)
+    # show_img(original_image,'OG image')
 
 
-    #use the transform from original image to warped image to transform all the corresponding points and display them
-    #on the map. 
-    new_thymio = four_point_matrix @ thymio_pose
-    # new_thymio_angle = thymio_theta - (np.pi)/2
-    new_goal = (four_point_matrix @ goal_pos).astype('int32')
-    top_view_img = cv2.circle(top_view_img, new_goal[:2], 20, (0,255,0), 5)
-    start = np.array(new_thymio[:2]).astype(int)
-    end = (int(start[0] + arrow_length*np.cos(thymio_theta)), int(start[1] + arrow_length*np.sin(thymio_theta)))
-    top_view_img = cv2.arrowedLine(top_view_img,start, end, (255,0,0), 20) #the angle should be off
-    show_img(top_view_img, 'top view')
+    # #use the transform from original image to warped image to transform all the corresponding points and display them
+    # #on the map. 
+    # new_thymio = four_point_matrix @ thymio_pose
+    # # new_thymio_angle = thymio_theta - (np.pi)/2
+    # new_goal = (four_point_matrix @ goal_pos).astype('int32')
+    # top_view_img = cv2.circle(top_view_img, new_goal[:2], 20, (0,255,0), 5)
+    # start = np.array(new_thymio[:2]).astype(int)
+    # end = (int(start[0] + arrow_length*np.cos(thymio_theta)), int(start[1] + arrow_length*np.sin(thymio_theta)))
+    # top_view_img = cv2.arrowedLine(top_view_img,start, end, (255,0,0), 20) #the angle should be off
+    # show_img(top_view_img, 'top view')
 
     # ###convert everything to map scale
     # pts = visio.rescale_points([*corners, thymio_pose[:2], goal_pos])
@@ -394,32 +432,30 @@ if __name__ == "__main__":
     # top_view_img = cv2.circle(top_view_img, r_goal, 20, (0,255,0), 5)
     # print(0)
 
-    # import time
-    # visio = Vision_module()
 
-    # visio.initialize_camera(cam_port=4)
-    # rslt,img = visio.capture_image()
-    
-    # if rslt:
-    #     print("yes")
-    #     markers = visio.get_6_markers(img)
-    #     corners = visio.get_map_corners(markers)
-    #     top_view_img, four_point_matrix = visio.four_point_transform(img,corners)
-    #     print(corners)
-    # else:
-    #     print("fail")
+    import time
+    i=0
+    while True:
+        i+=1
+        print(i)
+        rslt,img = visio.capture_image()
+        if rslt:
+            visio.img = img
+            markers, ids = visio.get_6_markers(img)
+            corners = visio.get_map_corners(markers, ids)
+        time.sleep(0.1)    
 
+   
 
     # while True:
-    #     rslt,img = visio.capture_image()
+    #     print("Capturing image...")
+    #     rslt, img = visio.capture_image()
     #     if rslt:
     #         visio.img = img
-    #         what = visio.get_6_markers(img)
-    #         markers, ids = visio.get_6_markers(img)
-    #         corners = visio.get_map_corners(markers, ids)
-    #         cv2.imshow(img)
-    #         cv2.waitKey(2000)
-    #         cv2.destroyAllWindows()
-
-    #     else:
-    #         time.sleep(1000)
+    #         if not show_img(img, 'Live Feed'):
+    #             break  # Exit if 'q' is pressed
+    #     time.sleep(0.1)  # Add a small delay to reduce CPU usage
+    
+    # Cleanup
+    visio.cam.release()
+    cv2.destroyAllWindows()
