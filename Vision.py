@@ -5,29 +5,6 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans ##### librairie pour le K-mean, le PCA,... #####
 
 
-##### interet de faire une class Vision_Thymio #####
-##### le optimal path du coup il va ici où dans le fichier filtering ou ailleur? #####
-##### on fait un nouveau fichier pour le filtering ou il va où? #####
-
-# Camera & Image Processing
-#Magic numbers
-#NB : opencv uses convention of [0,179], [0,255] and [0,255] for HSV values instead of the common [0,360],[0,100], [0,100]
-# UPPER_GREEN = np.array([120,255,255], dtype='uint8')    
-# LOWER_GREEN = np.array([70,0,0], dtype='uint8')
-
-# UPPER_BROWN = np.array([60,255,255])
-# LOWER_BROWN = np.array([0,0,0])
-
-
-# def show_img(img,title, wait_ms=1):
-#     cv2.namedWindow(title, cv2.WINDOW_NORMAL)
-#     cv2.imshow(title, img)
-#     while True: 
-#         if cv2.waitKey(wait_ms) & 255==ord('q'):  # Wait for a q press or window closed to close the window
-#             break
-#         if cv2.getWindowProperty(title, cv2.WND_PROP_VISIBLE) < 1:
-#             break
-#     cv2.destroyAllWindows()
 def show_img(img, title, wait_ms=1):
     cv2.namedWindow(title, cv2.WINDOW_NORMAL)
     cv2.imshow(title, img)
@@ -60,12 +37,15 @@ def squeeze(iterable,type=None):
         if type is not None:
             array = array.astype(type)
 
-        if array.shape == (1,): #if array is of dim1, it should not be squeezed into dim0
-            return array
-        if array.shape == ():  #if array is of dim0, bring it up to dim1
-            return np.array([array])
+        #squeeze the arrays out of its useless dimensions
+        array = array.squeeze() 
         
-        return array.squeeze()
+        #if array was squeezed too much (into dim0), bring it up to dim1
+        if array.shape == ():  
+            array = np.array([array])
+        
+        return array
+        
 
 class Vision_module():
     def __init__(self, image=None, map_size=(1000,1000)):
@@ -257,21 +237,34 @@ class Vision_module():
         dim3 is x and y of the corner'''
         markers, ids = self.detect_aruco(img)
         #verifiy that we have the 6 markers
+        if markers.shape == (0,):
+            print("Detected 0 markers")
+            return squeeze(markers), squeeze(ids)
         if not(len(ids)==6):
             print(f"Detected {len(ids)} markers instead of 6")
-            #exit(1)
-            #return squeeze(markers), squeeze(ids) #markers.squeeze(), ids.squeeze()
-        pairs = sorted(list(zip(ids,markers))) #make a list of corresponding [id,marker] pairs, then sort it
-        ids, markers = zip(*pairs) #unzip the pairs : ids are now in order 0-5 and the corresponding aruco corner markers are in the same order
-        # markers = np.array(markers).squeeze()  #get rid of the useless exterior array
-        # ids = np.array(ids).squeeze()
-        return squeeze(markers), squeeze(ids)
+
+        #if we have multiple markers, we need to order them    
+        if not(len(ids)== 1):
+            pairs = sorted(list(zip(ids,markers))) #make a list of corresponding [id,marker] pairs, then sort it
+            ids, markers = zip(*pairs) #unzip the pairs : ids are now in order 0-5 and the corresponding aruco corner markers are in the same order
+   
+        return squeeze(markers) , squeeze(ids)
         
     def get_map_corners(self,markers, ids):
         '''Gets the 4 corners of the map based on the marker positions'''
     
         #only keep the first 4 ones, corresponding to the corners
         markers = markers[:4]
+
+        #two ugly bug fixes
+        #annoying : if only one marker has been detected, squeeze() will reduce it to (2,)
+        #but we need (2,1)
+        if markers.shape == (2,):
+            markers = np.array([markers])
+        #if only one corner has been detected, because of squeeze() the shape will be (4,2) instead of (1,4,2)
+        if markers.shape == (4,2):
+            markers = np.array([markers])
+
         # corners_of_markers = []
         for i in range(len(ids)):
             corner_id = ids[i]
@@ -282,18 +275,9 @@ class Vision_module():
             center = center[:2]
             # center = self.find_marker_center_and_orientation(markers[corner_id])[:2]  #we only keep x and y, not theta
             self.map_corners[corner_id,:] = center
-            # corners_of_markers.append(center)
-            # if corner_id == 0:
-            #     self.map_corners[0,0,:] = center
-            # elif corner_id == 2:
-            #     self.map_corners[0,1,:] = center
-            # elif corner_id == 3:
-            #     self.map_corners[1,0,:] = center
-            # else:
-            #     self.map_corners[1,1,:] = center
 
         # self.map_corners = np.array(corners_of_markers)  #save the pixel coordinates of the map corners
-        self.highlight_corners(self.img,self.map_corners)
+        self.highlight_corners(self.img.copy(),self.map_corners)
         print(f"{len(ids)} markers detected, corners in memory are : {self.map_corners}")
         return self.map_corners
     
@@ -370,19 +354,11 @@ class Vision_module():
             highlighted_corners = cv2.rectangle(highlighted_corners, top_left, bottom_right, (255,0,255)) #purple
             in_memory += 1
 
-        # for i in range(4):
-        #     print(corners[i],colors[i])
-        #     highlighted_corners = cv2.circle(img,corners[i], 20, colors[i],4) #this is just for debugging
         if show: 
             show_img(highlighted_corners,"Corners : o = detected    [] = remembered")
 
         print(f"{len(ids)} detected corners, {in_memory} corners stored")
 
-    # def missing_corner(self,ids,markers):
-    #     if ids == (0,1,2,3) or ids == (0,1,2,3,4) or ids==(0,1,2,3,4,5):
-    #         print("all corners found")
-    #         return False
-    #     if 
 
 
 if __name__ == "__main__":
