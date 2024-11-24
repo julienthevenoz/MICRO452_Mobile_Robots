@@ -336,6 +336,7 @@ class Vision_module():
 
 
 if __name__ == "__main__":
+    #hello
     filename = 'Photos/Photo7.jpg'
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
     visio = Vision_module(img)
