@@ -1,20 +1,21 @@
 from tdmclient import ClientAsync, aw
+import asyncio
 
 class Thymio():
-    def __init__(self):
-        self.node = None
-        self.client = None
+    def __init__(self, node, client):
+        self.node = node
+        self.client = client
 
-    async def connect(self):
-        '''Connect to our thymio robot'''
-        try:
-            self.client = ClientAsync()
-            self.node = await self.client.wait_for_node()
-            await self.node.lock()
-            print("Successfully connected to Thymio robot")
-        except Exception as e:
-            print(f"Failed to connect to Thymio robot:{e}")
-            raise
+    # async def connect(self):
+    #     '''Connect to our thymio robot'''
+    #     try:
+    #         self.client = ClientAsync()
+    #         self.node = await self.client.wait_for_node()
+    #         await self.node.lock()
+    #         print("Successfully connected to Thymio robot")
+    #     except Exception as e:
+    #         print(f"Failed to connect to Thymio robot:{e}")
+    #         raise
 
     @staticmethod
     def motors(left, right):
