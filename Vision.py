@@ -18,7 +18,7 @@ import numpy as np
 #UPPER_BROWN = np.array([60,255,255])
 #LOWER_BROWN = np.array([0,0,0])
 
-MIN_AREA = 80
+MIN_AREA = 10
 DIST_THRESHOLD = 10
 
 
@@ -133,12 +133,16 @@ class Vision_module():
                 if not any(self.distance(point, existing_point) < threshold 
                            for existing_point in cleaned):
                     cleaned.append(point)
+            # Appliquer l'enveloppe convexe pour garantir une forme convexe
+            if len(cleaned) > 2:  # S'il y a suffisamment de points pour former un polygone
+                cleaned = cv2.convexHull(np.array(cleaned, dtype=np.int32)).reshape(-1, 2).tolist()
+        
             merged_cleaned.append(cleaned)
     
         return merged_cleaned
 
 
-    def detect_obstacle_corners(self, img, DIST_THRESHOLD=10, MIN_AREA=500):
+    def detect_obstacle_corners(self, img):
         """
         Détecte les bords des obstacles dans l'image, les approxime par des polygones,
         et garde uniquement ceux dont la couleur moyenne est noire (obstacles).
@@ -165,8 +169,8 @@ class Vision_module():
         img_with_polygons = img.copy()
 
         # 8. Plage de teinte pour le noir (en HSV)
-        lower_black_hsv = np.array([0, 0, 30])  # Ajustez selon vos besoins
-        upper_black_hsv = np.array([179, 140, 120])
+        lower_black_hsv = np.array([0, 80, 20])  # Ajustez selon vos besoins
+        upper_black_hsv = np.array([179, 150, 120])
 
         # 9. Parcourir chaque contour trouvé
         approx_img = img.copy()  # Image pour visualiser l'approximation des polygones
@@ -181,7 +185,7 @@ class Vision_module():
             # Dessiner les coins du polygone
             for (x, y) in approx.reshape(-1, 2):  # Dessiner les coins
                 cv2.circle(approx_img, (x, y), 5, (0, 0, 255), -1)  # Coins en rouge
-            cv2.drawContours(approx_img, [approx], -1, color, 2)  # Dessiner les polygones en bleu
+            cv2.drawContours(approx_img, [approx], -1, color, 2)  # Dessiner les polygones
             obstacle_corners.append(approx.reshape(-1, 2).tolist())
 
         # Affichage intermédiaire de l'approximation des polygones
@@ -203,10 +207,20 @@ class Vision_module():
 
         # 11. Calculer la moyenne des couleurs à l'intérieur des polygones et filtrer par couleur
         final_polygons = []
+        MIN_AREA = 1000  # Seuil d'aire minimal pour un polygone
+
         for polygon in obstacle_corners:
             # Créer un masque pour extraire l'intérieur du polygone
             mask = np.zeros_like(hsv_img[:, :, 0])
             cv2.drawContours(mask, [np.array(polygon, dtype=np.int32)], -1, (255), thickness=cv2.FILLED)
+
+            # Calcul de l'aire du polygone
+            polygon_array = np.array(polygon, dtype=np.int32)
+            area = cv2.contourArea(polygon_array)
+
+            # Si l'aire est inférieure au seuil, on ignore ce polygone
+            if area < MIN_AREA:
+                continue  # Passer au prochain polygone si l'aire est trop petite
 
             # Calcul de la moyenne des couleurs à l'intérieur du polygone en HSV
             mean_color_hsv = cv2.mean(hsv_img, mask=mask)
@@ -230,6 +244,7 @@ class Vision_module():
         show_many_img([final_img], ["Polygones filtrés"])
 
         return final_polygons, final_img
+
     
     def modify_image_for_visualization(self, img, obstacle_corners, tymio_position, tymio_radius=40):
         """
@@ -456,7 +471,7 @@ class Vision_module():
         return 
 
 if __name__ == "__main__":
-    filename = 'Photos/tymio_islands_resised.jpg'
+    filename = 'Photos/tymio_islands.jpg'
 
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
     # Vérifier si l'image est correctement chargée

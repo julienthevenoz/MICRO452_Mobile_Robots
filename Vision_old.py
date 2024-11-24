@@ -21,7 +21,7 @@ def show_hsv_values(event, x, y, flags, param):
         cv2.imshow("Image with HSV values", img_copy)
 
 # Charger l'image
-img = cv2.imread('Photos/tymio_islands_resised.jpg')
+img = cv2.imread('Photos/tymio_islands.jpg')
 
 # Créer une fenêtre
 cv2.imshow("Image with HSV values", img)
