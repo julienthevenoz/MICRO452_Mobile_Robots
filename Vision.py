@@ -58,6 +58,8 @@ class VisionModule:
         #dim 0 is which corner (0,1,2,3 = tl,tr,br,bl), dim1 is x or y
         self.map_corners = np.ones((4,2),dtype='int32')*(-1)
         self.map_size = map_size  #arbitrary chosen metric of our map
+        self.last_thymio_pose = None
+        self.last_goal_pos = None
 
     def initialize_camera(self, cam_port=0):
         """Initialise la caméra"""
@@ -441,16 +443,26 @@ class VisionModule:
 
     def detect_thymio_pose(self,thymio_marker):
         '''Returns integer position array [x,y,z=0] and float theta corresponding to Thymio position and orientation '''
-        x,y,theta = self.find_marker_center_and_orientation(thymio_marker)
-        #we return the position with 
+        if thymio_marker is not None:
+            x,y,theta = self.find_marker_center_and_orientation(thymio_marker)
+            # we return the position and orientation of the thymio
+            self.last_thymio_pose = tuple((x,y,theta))
+            return np.array([x,y], dtype='int32'), theta
+        
+        x,y,theta = self.last_thymio_pose
         return np.array([x,y], dtype='int32'), theta
+    
 
 
     def detect_goal_position(self, goal_marker):
         ''' Return int array [x,y,z=0] corresponding to goal position'''
+        if goal_marker is not None:
+            x,y,_ = self.find_marker_center_and_orientation(goal_marker)
+            # we return the position of the goal
+            self.last_goal_position = tuple((x,y))
+            return np.array([x,y], dtype='int32')
         x,y,_ = self.find_marker_center_and_orientation(goal_marker)
         return np.array([x,y], dtype='int32')
-    
     
     def get_2_markers(self, top_view_img):
         """
@@ -460,8 +472,8 @@ class VisionModule:
 
         # Verify that we have at least the two desired markers
         if not (len(ids) >= 2):
-            print(f"Detected {len(ids)} markers instead of at least 2.")
-            return markers.squeeze(), ids.squeeze()
+            print(f"(Find 2 marker) Detected {len(ids)} markers instead of at least 2.")
+            #return markers.squeeze(), ids.squeeze()
 
         # Identify markers by their IDs: assume Thymio (e.g., ID=4) and Goal (e.g., ID=5)
         thymio_marker = None
@@ -474,10 +486,10 @@ class VisionModule:
 
         if thymio_marker is None:
             print("Unable to detect Thymio.")
-            return False
+            #return False
         if goal_marker is None:
             print("Unable to detect the Goal marker.")
-            return False
+            #return False
         return thymio_marker, goal_marker
 
     def julien_main(self, img):
@@ -565,9 +577,15 @@ class CameraFeedThread(threading.Thread):
 
                 obstacle_corners, img_with_polygons = self.vision_module.detect_obstacle_corners(top_view)
 
+                arrow_length = 100
+                # Calculate the end point of the arrow using the angle theta
+                end_x = int(robot_position[0] + arrow_length * np.cos(theta))
+                end_y = int(robot_position[1] + arrow_length * np.sin(theta))
+                top_view = cv2.arrowedLine(top_view, robot_position, (end_x, end_y), (0, 0, 255), 5)
+                top_view = cv2.arrowedLine(top_view, robot_position, goal_position, (255, 0, 0), 8)
 
                 # Afficher les deux images en parallèle
-                show_many_img([frame, img_with_polygons, annotated_img], ["Original", "Processed_with_polygones", "Highlighting corners"])
+                show_many_img([frame, img_with_polygons, annotated_img, top_view], ["Original", "Processed_with_polygones", "Highlighting corners", "thymio Oop, baby"])
 
                 # Quitter si la touche 'q' est pressée
                 if cv2.waitKey(1) & 0xFF == ord('q'):
