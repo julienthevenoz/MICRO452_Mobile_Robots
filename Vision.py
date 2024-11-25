@@ -50,9 +50,11 @@ def show_img(img, title):
 
 class VisionModule:
     """Module de gestion de la caméra et analyse d'image"""
-    def __init__(self image=None, map_size=(1000,1000)):
+    def __init__(self, image=None, map_size=(1000,1000)):
         self.cam = None
-        self.frame = None
+        self.frame = image  #this should always contain the original, unaltered image
+        self.frame_viz = None  #this is where the original frame WITH annotations should be
+        self.top_view = None   #this is where the top-view visualization should be
         #dim 0 is which corner (0,1,2,3 = tl,tr,br,bl), dim1 is x or y
         self.map_corners = np.ones((4,2),dtype='int32')*(-1)
         self.map_size = map_size  #arbitrary chosen metric of our map
@@ -281,13 +283,12 @@ class VisionModule:
         [TL, TR, BR, BL, Thymio, Goal]. Dim1 is markers, dim2 is corners of the marker
         dim3 is x and y of the corner'''
         markers, ids = self.detect_aruco(img)
-        #verifiy that we have the 6 markers
+        print(f"Detected {len(ids)} markers : {list(squeeze(ids))}")
         if markers.shape == (0,):
-            print("Detected 0 markers")
             return squeeze(markers), squeeze(ids)
-        if not(len(ids)==6):
-            print(f"Detected {len(ids)} markers instead of 6")
-
+        #verifiy that we have the 6 markers   
+        # if not(len(ids)==6):
+        #     print(f"Detected {len(ids)} markers instead of 6")
         #if we have multiple markers, we need to order them    
         if not(len(ids)== 1):
             pairs = sorted(list(zip(ids,markers))) #make a list of corresponding [id,marker] pairs, then sort it
@@ -337,13 +338,11 @@ class VisionModule:
             if not(corner_id in ids) or corner_id >= 4:  
                 continue
             center = self.find_marker_center_and_orientation(markers[i])
-            center = center[:2]
-            # center = self.find_marker_center_and_orientation(markers[corner_id])[:2]  #we only keep x and y, not theta
+            center = center[:2]  #only need (x,y), not theta
             self.map_corners[corner_id,:] = center
 
-        # self.map_corners = np.array(corners_of_markers)  #save the pixel coordinates of the map corners
-        self.highlight_corners(self.img.copy(),self.map_corners)
-        print(f"{len(ids)} markers detected, corners in memory are : {self.map_corners}")
+        self.highlight_corners(self.frame.copy(),self.map_corners)
+        # print(f"{len(ids)} markers detected, corners in memory are : {self.map_corners}")
         return self.map_corners
     
     def four_point_transform(self, image, pts):
@@ -399,11 +398,11 @@ class VisionModule:
     def highlight_corners(self, image, corners, title='highlighted corners', show=True):
         '''Draws a circle around the corners detected in this iteration,
         and a rectangle around the corners remebered/stored in self.map_corners '''
-        img = image.copy()
+        # img = image.copy()
         corners = squeeze(corners, type='int32') #np.array(corners, dtype='int32').squeeze()
         colors = [(0,0,255),(0,255,0),(255,0,0),(0,255,255)]  #red, green, blue, yellow
         for i,corner in enumerate(corners):
-            highlighted_corners = cv2.circle(img,corner, 20, colors[i],4) #this is just for debugging
+            highlighted_corners = cv2.circle(self.frame.copy(),corner, 20, colors[i],4) #this is just for debugging
         in_memory = 0
         for stored_corner in self.map_corners:
             if stored_corner[0] == -1:  #don't show corners which haven't been initialized
@@ -415,15 +414,22 @@ class VisionModule:
             in_memory += 1
 
         if show: 
-            show_img(highlighted_corners,"Corners : o = detected    [] = remembered")
+            # show_img(highlighted_corners,"Corners : o = detected    [] = remembered")
+            self.frame_viz = highlighted_corners
 
         print(f"{len(corners)} detected corners, {in_memory} corners stored")
 
-    def detect_thymio_pose(self,markers):
+        
+
+    def detect_thymio_pose(self, markers, ids):
         '''Returns integer position array [x,y,z=0] and float theta corresponding to Thymio position and orientation '''
-        thymio_marker = (markers[4])
+        thymio_id = 4
+        if not(thymio_id in ids):
+            print("Thymio marker not detcted")
+            return None, None
+        thymio_marker = markers[np.where(ids == thymio_id)[0][0]] #get the thymio_marker
         x,y,theta = self.find_marker_center_and_orientation(thymio_marker)
-        #we return the position with 
+        #we return the position and angle
         return np.array([x,y,0], dtype='int32'), theta 
     
 
@@ -435,35 +441,41 @@ class VisionModule:
     
 
 
-    def julien_main(self):
+    def julien_main(self, img):
         ''' ThIS SHOULD NOT STAY ! I only put it as an example of how my code is supposed to be used '''
-        visio = VisionModule()
-        visio.initialize_camera(cam_port=4)
-        ### take a photo with Tifaine's code, or open an already existing photo
-        filename = 'Photos/Photo7.jpg'
-        img = cv2.imread(filename, cv2.IMREAD_COLOR)
+        # visio = VisionModule()
+        # visio.initialize_camera(cam_port=4)
+        # ### take a photo with Tifaine's code, or open an already existing photo
+        # filename = 'Photos/Photo7.jpg'
+        # img = cv2.imread(filename, cv2.IMREAD_COLOR)
 
         #get location of 6 markers (and their ids) in camera frame
         #NB this function, and all the rest, *should* still work if some markers aren't detected
-        markers, ids = visio.get_6_markers(img)
+        markers, ids = self.get_6_markers(img)
         #find the coordinates of the 4 map corners (4x2 array).
-        corners = visio.get_map_corners(markers, ids)
-        thymio_pose, thymio_theta = visio.detect_thymio_pose(markers)
-        goal_pos = visio.detect_goal_position(markers)
+        corners = self.get_map_corners(markers, ids)
+        top_view_img, four_point_matrix = self.four_point_transform(img,corners)
+        self.top_view = top_view_img
+        return 
+        thymio_pose, thymio_theta = self.detect_thymio_pose(markers, ids)
+        goal_pos = self.detect_goal_position(markers)
+    
         #let's put a green circle on top of the goal
-        original_image = cv2.circle(img, goal_pos[:2], 20, (0,255,0), 5)
+        annotated_OG_img = cv2.circle(img.copy(), goal_pos[:2], 20, (0,255,0), 5)
         #let's draw an arrow from the center of the thymio in the direction where it's looking
         arrow_length = 100 #in pixels
         start = thymio_pose[:2]
         end = (int(start[0] + arrow_length*np.cos(thymio_theta)), int(start[1] + arrow_length*np.sin(thymio_theta)))
-        # end = start + (arrow_length*np.cos(thymio_pose[2]),arrow_length*np.sin(thymio_pose[2]))
-        original_image = cv2.arrowedLine(original_image,start, end, (255,0,0), 20)
+        end = start + (arrow_length*np.cos(thymio_pose[2]),arrow_length*np.sin(thymio_pose[2]))
+        annotated_OG_img = cv2.arrowedLine(annotated_OG_img,start, end, (255,0,0), 20)
         #let's put a green circle on top of the goal
-        original_image = cv2.circle(original_image, goal_pos[:2], 20, (0,255,0), 5)
-        show_img(original_image,'OG image')
+        annotated_OG_img = cv2.circle(annotated_OG_img, goal_pos[:2], 20, (0,255,0), 5)
+        # show_img(annotated_OG_img,'OG image')
+        # self.frame_viz = annotated_OG_img
 
          #use the 4 corner coordinates to do a perspective transform (correct, flatten, crop) on the map corners
-        top_view_img, four_point_matrix = visio.four_point_transform(img,corners)
+        top_view_img, four_point_matrix = self.four_point_transform(img,corners)
+        self.top_view = top_view_img
         #draw the circle and arrow on the transformed image too
         #!NB : THIS CODE IS PROBABLY NOT WORKING ! BUT ZHUORAN FIXED IT ?
         new_thymio = four_point_matrix @ thymio_pose
@@ -473,17 +485,19 @@ class VisionModule:
         start = np.array(new_thymio[:2]).astype(int)
         end = (int(start[0] + arrow_length*np.cos(thymio_theta)), int(start[1] + arrow_length*np.sin(thymio_theta)))
         annotated_top_view = cv2.arrowedLine(annotated_top_view,start, end, (255,0,0), 20) #the angle should be off
-        show_img(annotated_top_view, 'top view visulazation')
+        # show_img(annotated_top_view, 'top view visulazation')
 
         #convert all coordinates to our "imaginary" map coordinates
         #! NB : this only needs the original camera frame coordinates, the 4 points transform and so on
         #! is only there for visualisation
-        pts = visio.rescale_points([*corners, thymio_pose[:2], goal_pos])
+        pts = self.rescale_points([*corners, thymio_pose[:2], goal_pos])
         *r_corners, r_thymio, r_goal = pts
         r_goal = np.array(r_goal).astype(int)
         imaginary_coordinates = cv2.circle(top_view_img.copy(), r_goal, 20, (0,255,0), 5)
         imaginary_coordinates = cv2.circle(imaginary_coordinates, r_thymio, 20, (255,0,0))
         print(0)
+
+        return annotated_OG_img
 
 
 
@@ -503,9 +517,12 @@ class CameraFeedThread(threading.Thread):
                 # Appeler la méthode pour détecter les coins des obstacles
                 obstacle_corners, img_with_polygons = self.vision_module.detect_obstacle_corners(frame)
 
+                self.vision_module.julien_main(img_with_polygons)
+                annotated_img = self.vision_module.frame_viz
+                top_view = self.vision_module.top_view
 
                 # Afficher les deux images en parallèle
-                show_many_img([frame, img_with_polygons], ["Original", "Processed_with_polygones"])
+                show_many_img([frame, img_with_polygons, annotated_img], ["Original", "Processed_with_polygones", "Highlighting corners"])
 
                 # Quitter si la touche 'q' est pressée
                 if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -520,7 +537,7 @@ class CameraFeedThread(threading.Thread):
 def main():
     """Point d'entrée principal"""
     vision = VisionModule()
-    if not vision.initialize_camera(cam_port=0):
+    if not vision.initialize_camera(cam_port=4):
         print("Erreur : Impossible d'initialiser la caméra.")
         return
 
