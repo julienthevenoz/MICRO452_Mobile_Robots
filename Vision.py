@@ -421,23 +421,36 @@ class VisionModule:
 
         
 
-    def detect_thymio_pose(self, markers, ids):
-        '''Returns integer position array [x,y,z=0] and float theta corresponding to Thymio position and orientation '''
-        thymio_id = 4
-        if not(thymio_id in ids):
-            print("Thymio marker not detcted")
-            return None, None
-        thymio_marker = markers[np.where(ids == thymio_id)[0][0]] #get the thymio_marker
-        x,y,theta = self.find_marker_center_and_orientation(thymio_marker)
-        #we return the position and angle
-        return np.array([x,y,0], dtype='int32'), theta 
+    #def detect_thymio_pose(self, markers, ids):
+    #    '''Returns integer position array [x,y,z=0] and float theta corresponding to Thymio position and orientation '''
+    #    thymio_id = 4
+    #    if not(thymio_id in ids):
+    #        print("Thymio marker not detcted")
+    #        return None, None
+    #    thymio_marker = markers[np.where(ids == thymio_id)[0][0]] #get the thymio_marker
+    #    x,y,theta = self.find_marker_center_and_orientation(thymio_marker)
+    #    #we return the position and angle
+    #    return np.array([x,y,0], dtype='int32'), theta 
     
 
-    def detect_goal_position(self, markers):
+    #def detect_goal_position(self, markers):
+    #    ''' Return int array [x,y,z=0] corresponding to goal position'''
+    #    goal_marker = markers[5]
+    #    x,y,_ = self.find_marker_center_and_orientation(goal_marker)
+    #    return np.array([x,y,0], dtype='int32')
+
+    def detect_thymio_pose(self,thymio_marker):
+        '''Returns integer position array [x,y,z=0] and float theta corresponding to Thymio position and orientation '''
+        x,y,theta = self.find_marker_center_and_orientation(thymio_marker)
+        #we return the position with 
+        return np.array([x,y], dtype='int32'), theta
+
+
+    def detect_goal_position(self, goal_marker):
         ''' Return int array [x,y,z=0] corresponding to goal position'''
-        goal_marker = markers[5]
         x,y,_ = self.find_marker_center_and_orientation(goal_marker)
-        return np.array([x,y,0], dtype='int32')
+        return np.array([x,y], dtype='int32')
+    
     
     def get_2_markers(self, top_view_img):
         """
