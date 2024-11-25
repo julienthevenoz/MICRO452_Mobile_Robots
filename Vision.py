@@ -515,11 +515,13 @@ class CameraFeedThread(threading.Thread):
                 # Utilisation de la méthode d'analyse de VisionModule
                 #processed_frame = self.vision_module.analyze_frame(frame)
                 # Appeler la méthode pour détecter les coins des obstacles
-                obstacle_corners, img_with_polygons = self.vision_module.detect_obstacle_corners(frame)
 
-                self.vision_module.julien_main(img_with_polygons)
+                self.vision_module.julien_main(frame)
                 annotated_img = self.vision_module.frame_viz
                 top_view = self.vision_module.top_view
+
+                obstacle_corners, img_with_polygons = self.vision_module.detect_obstacle_corners(top_view)
+
 
                 # Afficher les deux images en parallèle
                 show_many_img([frame, img_with_polygons, annotated_img], ["Original", "Processed_with_polygones", "Highlighting corners"])
