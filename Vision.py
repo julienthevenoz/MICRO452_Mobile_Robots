@@ -439,7 +439,33 @@ class VisionModule:
         x,y,_ = self.find_marker_center_and_orientation(goal_marker)
         return np.array([x,y,0], dtype='int32')
     
+    def get_2_markers(self, top_view_img):
+        """
+        Find 2 markers (Thymio and Goal) in the top-view image
+        """
+        markers, ids = self.detect_aruco(top_view_img)
 
+        # Verify that we have at least the two desired markers
+        if not (len(ids) >= 2):
+            print(f"Detected {len(ids)} markers instead of at least 2.")
+            return markers.squeeze(), ids.squeeze()
+
+        # Identify markers by their IDs: assume Thymio (e.g., ID=4) and Goal (e.g., ID=5)
+        thymio_marker = None
+        goal_marker = None
+        for marker, marker_id in zip(markers, ids):
+            if marker_id == 4:  # Replace '4' with the actual ID for Thymio
+                thymio_marker = marker
+            elif marker_id == 5:  # Replace '5' with the actual ID for Goal
+                goal_marker = marker
+
+        if thymio_marker is None:
+            print("Unable to detect Thymio.")
+            return False
+        if goal_marker is None:
+            print("Unable to detect the Goal marker.")
+            return False
+        return thymio_marker, goal_marker
 
     def julien_main(self, img):
         ''' ThIS SHOULD NOT STAY ! I only put it as an example of how my code is supposed to be used '''
