@@ -307,10 +307,11 @@ class Vision_module():
         y_center = alpha*x_center + (tr[1] - alpha*tr[0]) # use the equation of the bl->tr diagonal to find y_center
 
         #now we will use the dot product to find the relative angle between the top side of the marker (tl->tr) and the horizontal
-        top_side = np.array([tr[0]-br[0],tr[1]-br[1]])
-        top_side = top_side / np.linalg.norm(top_side) #normalize the vector
-        unit_hvec = np.array([1,0])  #unitary horizontal vector
-        theta = np.arccos(np.dot(top_side,unit_hvec)) # v1 dot v2 = ||v1||*||v2||*cos(theta) = cos(theta) if vects are unitary
+        # top_side = np.array([tr[0]-br[0],tr[1]-br[1]])
+        # top_side = top_side / np.linalg.norm(top_side) #normalize the vector
+        # unit_hvec = np.array([1,0])  #unitary horizontal vector
+        # theta = np.arccos(np.dot(top_side,unit_hvec)) # v1 dot v2 = ||v1||*||v2||*cos(theta) = cos(theta) if vects are unitary
+        theta = np.arctan2((tr[1]-br[1]), (tr[0]-br[0]))
         return x_center,y_center, theta
 
     def detect_thymio_pose(self,thymio_marker):
@@ -379,7 +380,7 @@ if __name__ == "__main__":
     arrow_length = 500
     # Calculate the end point of the arrow using the angle theta
     end_x = int(robot_position[0] + arrow_length * np.cos(theta))
-    end_y = int(robot_position[1] - arrow_length * np.sin(theta))
+    end_y = int(robot_position[1] + arrow_length * np.sin(theta))
     top_view_img = cv2.arrowedLine(top_view_img, robot_position, (end_x, end_y), (0, 0, 255), 5)
     top_view_img = cv2.arrowedLine(top_view_img, robot_position, goal_position, (255, 0, 0), 20)
 
