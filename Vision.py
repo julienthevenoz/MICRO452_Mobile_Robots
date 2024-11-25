@@ -520,6 +520,10 @@ class CameraFeedThread(threading.Thread):
                 annotated_img = self.vision_module.frame_viz
                 top_view = self.vision_module.top_view
 
+                Thymio_marker, goal_marker = self.vision_module.get_2_markers(top_view)
+                robot_position, theta = self.vision_module.detect_thymio_pose(Thymio_marker)
+                goal_position = self.vision_module.detect_goal_position(goal_marker)
+
                 obstacle_corners, img_with_polygons = self.vision_module.detect_obstacle_corners(top_view)
 
 
