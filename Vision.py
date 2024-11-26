@@ -318,10 +318,11 @@ class VisionModule:
         y_center = alpha*x_center + (tr[1] - alpha*tr[0]) # use the equation of the bl->tr diagonal to find y_center
 
         #now we will use the dot product to find the relative angle between the top side of the marker (tl->tr) and the horizontal
-        top_side = np.array([tr[0]-tl[0],tr[1]-tl[1]])
-        top_side = top_side / np.linalg.norm(top_side) #normalize the vector
-        unit_hvec = np.array([1,0])  #unitary horizontal vector
-        theta = np.arccos(np.dot(top_side,unit_hvec)) # v1 dot v2 = ||v1||*||v2||*cos(theta) = cos(theta) if vects are unitary
+        # top_side = np.array([tr[0]-br[0],tr[1]-br[1]])
+        # top_side = top_side / np.linalg.norm(top_side) #normalize the vector
+        # unit_hvec = np.array([1,0])  #unitary horizontal vector
+        # theta = np.arccos(np.dot(top_side,unit_hvec)) # v1 dot v2 = ||v1||*||v2||*cos(theta) = cos(theta) if vects are unitary
+        theta = np.arctan2((tr[1]-br[1]), (tr[0]-br[0]))
         return x_center,y_center, theta
     
     def get_map_corners(self,markers, ids):
@@ -587,6 +588,17 @@ class CameraFeedThread(threading.Thread):
         super().__init__()
         self.vision_module = vision_module
         self.stop_event = threading.Event()
+        self.robot_pose = []
+        self.goal_position = []
+        self.obstacle_corners = []
+
+    def get_thymio_goal_and_obstacles(self):
+        '''Returns [x,y,theta] of thymio, [x,y] of goal and list of obstacle 
+        corners = [[corner1,corner2],[corner1,corner2,corner3,corner4],[corner1,corner2,corner3]]
+        where cornerX is itself a list of two coordinates [x_corner1,y_corner1].
+        If the corresponding markers are not detected, returns empty lists []'''
+        return self.robot_pose, self.goal_position, self.obstacle_corners
+
 
     def run(self):
         while not self.stop_event.is_set():
@@ -604,9 +616,10 @@ class CameraFeedThread(threading.Thread):
 
                 #output variables : 
                 # - [x,y,theta] of thymio - [x,y] of goal   -list of obstacle corners (list of list ?)
-                #if they have not been detected, will return None
-                robot_pose = [None,None,None]
-                goal_position = [None,None]
+                #if they have not been detected, will return empty list []
+                robot_pose = []
+                goal_position = []
+                obstacle_corners = []
 
 
                 #! alternative : if not detected, will return last known pose and goal instead
@@ -636,7 +649,10 @@ class CameraFeedThread(threading.Thread):
 
                 obstacle_corners, img_with_polygons = self.vision_module.detect_obstacle_corners(top_view)
 
-
+                #update attributes
+                self.obstacle_corners = obstacle_corners
+                self.robot_pose = robot_pose
+                self.goal_position = goal_position
                 
                 # Afficher les deux images en parallèle
                 show_many_img([frame, img_with_polygons, annotated_img, top_view], ["Original", "Processed_with_polygones", "Highlighting corners", "thymio Oop, baby"])
@@ -654,7 +670,7 @@ class CameraFeedThread(threading.Thread):
 def main():
     """Point d'entrée principal"""
     vision = VisionModule()
-    if not vision.initialize_camera(cam_port=0):
+    if not vision.initialize_camera(cam_port=4):
         print("Erreur : Impossible d'initialiser la caméra.")
         return
 
