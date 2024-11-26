@@ -73,6 +73,8 @@ class MotionControl:
     return v, omega
 
   def path_tracking(self, robot_state, goal_point):
+    if not robot_state or not goal_point:
+      return False
     x, y, theta = robot_state
     x_goal, y_goal = goal_point
     delta_x = x_goal - x
