@@ -242,7 +242,7 @@ class Analysis:
         #convert to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
-        parameters =  cv2.aruco.DetectorParameters()
+        parameters = cv2.aruco.DetectorParameters()
         detector = cv2.aruco.ArucoDetector(dictionary, parameters)
 
         markerCorners, markerIds, _ = detector.detectMarkers(gray)
@@ -307,7 +307,7 @@ class Analysis:
 
         return x_center,y_center, theta
     
-    def get_map_corners(self,markers, ids):
+    def get_map_corners(self, markers, ids):
         '''Gets the 4 corners of the map based on the marker positions'''
     
         #only keep the first 4 ones, corresponding to the corners
@@ -475,6 +475,8 @@ class Analysis:
 
     def julien_main(self, img):
         ''' ThIS SHOULD NOT STAY ! I only put it as an example of how my code is supposed to be used '''
+        self.frame = img
+        self.frame_viz = img
 
         #get location of 6 markers (and their ids) in camera frame
         #NB this function, and all the rest, *should* still work if some markers aren't detected
@@ -517,95 +519,119 @@ class CameraFeed(threading.Thread):
         print(f"Camera initialized on port {cam_port}")
         return True
 
-    def capture_frame(self):
+    def get_latest_frame(self):
         """Return the most recently captured frame"""
-        if not self.cam or not self.cam.isOpened():
-            print("Camera not initialised")
-            return None
-
-        ret, frame = self.cam.read()
-        if not ret:
-            print("Failed to capture image")
-            return None
-
-        self.frame = frame
-        return frame
+        return self.frame
     
     def run(self):
+        """Capture frames continuously"""
         while not self.stop_event.is_set():
-            frame = self.vision_module.capture_frame()
-            if frame is not None:
-                # Utilisation de la méthode d'analyse de Analysis
-                #processed_frame = self.vision_module.analyze_frame(frame)
-                # Appeler la méthode pour détecter les coins des obstacles
-
-                self.vision_module.julien_main(frame)
-                if self.vision_module.frame_viz is None:
-                    self.vision_module.frame_viz = frame
-                annotated_img = self.vision_module.frame_viz
-                top_view = self.vision_module.top_view
-
-                #output variables : 
-                # - [x,y,theta] of thymio - [x,y] of goal   -list of obstacle corners (list of list ?)
-                #if they have not been detected, will return empty list []
-                robot_pose = []
-                goal_position = []
-                obstacle_corners = []
-
-
-                #! alternative : if not detected, will return last known pose and goal instead
-                #! Julien thinks it's not a good idea
-                # robot_pose = self.vision_module.last_thymio_pose
-                # goal_position = self.vision_module.last_goal_pos
-
-
-                Thymio_marker, goal_marker = self.vision_module.get_2_markers(top_view)
-                if Thymio_marker is not None: 
-                    robot_pose= self.vision_module.detect_thymio_pose(Thymio_marker)  
-
-                    arrow_length = 100
-                    # Calculate the end point of the arrow using the angle theta
-                    end_x = int(robot_pose[0] + arrow_length * np.cos(robot_pose[2]))
-                    end_y = int(robot_pose[1] + arrow_length * np.sin(robot_pose[2]))
-                    top_view = cv2.arrowedLine(top_view, np.array(robot_pose[:2],dtype='int32'), (end_x, end_y), (0, 0, 255), 5)
+            if self.cam and self.cam.isOpened():
+                ret, frame = self.cam.read()
+                if ret:
+                    self.frame = frame
                 else:
-                    print("Thymio not detected")
-           
-                if goal_marker is not None:
-                    goal_position = self.vision_module.detect_goal_position(goal_marker)
-                    if Thymio_marker is not None:
-                        top_view = cv2.arrowedLine(top_view, np.array(robot_pose[:2],dtype='int32'), np.array(goal_position, dtype='int32'), (255, 0, 0), 8)
-                else:
-                    print("Goal not detected")
-
-                obstacle_corners, img_with_polygons = self.vision_module.detect_obstacle_corners(top_view)
-
-                #update attributes
-                self.obstacle_corners = obstacle_corners
-                self.robot_pose = robot_pose
-                self.goal_position = goal_position
-                
-                # Afficher les deux images en parallèle
-                show_many_img([frame, img_with_polygons, annotated_img, top_view], ["Original", "Processed_with_polygones", "Highlighting corners", "thymio Oop, baby"])
-
-                # Quitter si la touche 'q' est pressée
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    self.stop()
+                    print("Failed to capture frame.")
+            time.sleep(0.01)  # Avoid excessive CPU usage
 
     def stop(self):
-        """Arrêter le thread et libérer la caméra"""
+        """Stop capturing frames and release the camera"""
         self.stop_event.set()
-        self.vision_module.release_camera()
-
+        if self.cam:
+            self.cam.release()
+        cv2.destroyAllWindows()
+    
 
 
 class Vision():
     """Main class to coordinate CameraFeed and Analysis"""
-    def __init__(self):
-    # Instantiate CameraFeed and Analysis
+    def __init__(self, cam_port=0):
         self.camera_feed = CameraFeed()
         self.analysis = Analysis()
+        self.cam_port = cam_port
         self.stop_event = threading.Event()
+
+        self.robot_pose = []
+        self.goal_position = []
+        self.obstacle_corners = []
+
+    def initialize_system(self):
+        """Initialize the camera and start the threads"""
+        if not self.camera_feed.initialize_camera(self.cam_port):
+            print("Error: Unable to initialize the camera.")
+            return False
+        self.camera_feed.start()
+        print("System initialized.")
+        return True
+    
+    def process_frame(self, frame):
+        """Process the captured frame and update attributes"""
+        # Run main analysis
+        self.analysis.julien_main(frame)
+
+        # Get processed frames for visualization
+        annotated_img = self.analysis.frame_viz if self.analysis.frame_viz.any() else frame
+        top_view = self.analysis.top_view
+
+        # Initialize default variables
+        robot_pose = []
+        goal_position = []
+        obstacle_corners = []
+
+        Thymio_marker, goal_marker = self.analysis.get_2_markers(top_view)
+
+        # Detect Thymio marker
+        if Thymio_marker is not None:
+            robot_pose = self.analysis.detect_thymio_pose(Thymio_marker)
+            # Draw an arrow indicating the orientation
+            arrow_length = 100
+            end_x = int(robot_pose[0] + arrow_length * np.cos(robot_pose[2]))
+            end_y = int(robot_pose[1] + arrow_length * np.sin(robot_pose[2]))
+            top_view = cv2.arrowedLine(top_view, np.array(robot_pose[:2], dtype='int32'), 
+                                       (end_x, end_y), (0, 0, 255), 5)
+            #top_view = cv2.arrowedLine(top_view, robot_position, (end_x, end_y), (0, 0, 255), 5)
+        else:
+            print("Thymio not detected")
+
+        # Detect goal marker
+        if goal_marker is not None:
+            goal_position = self.analysis.detect_goal_position(goal_marker)
+            if robot_pose:
+                top_view = cv2.arrowedLine(top_view, np.array(robot_pose[:2], dtype='int32'), 
+                                           np.array(goal_position, dtype='int32'), (255, 0, 0), 8)
+                #top_view = cv2.arrowedLine(top_view, robot_position, goal_position, (255, 0, 0), 8)
+        else:
+            print("Goal not detected")
+
+        # Detect obstacle corners
+        obstacle_corners, img_with_polygons = self.analysis.detect_obstacle_corners(top_view)
+
+        # Update Vision attributes
+        self.robot_pose = robot_pose
+        self.goal_position = goal_position
+        self.obstacle_corners = obstacle_corners
+
+        # Show the results in multiple windows
+        show_many_img([frame, img_with_polygons, annotated_img, top_view], 
+                      ["Original", "Processed_with_polygons", "Highlighting corners", "Thymio View"])
+
+    def run(self):
+        """Monitor the camera feed and perform analysis"""
+        try:
+            while not self.stop_event.is_set():
+                frame = self.camera_feed.get_latest_frame()
+                if frame is not None:
+                    self.process_frame(frame)
+                    # Perform analysis on the frame
+
+                # Check for 'q' key to quit
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    self.stop()
+                time.sleep(0.5)  # Run analysis every 0.2 seconds
+        except KeyboardInterrupt:
+            print("Vision system interrupted.")
+        finally:
+            self.stop()
 
     def get_thymio_goal_and_obstacles(self):
         '''Returns [x,y,theta] of thymio, [x,y] of goal and list of obstacle 
@@ -614,30 +640,56 @@ class Vision():
         If the corresponding markers are not detected, returns empty lists []'''
         return self.robot_pose, self.goal_position, self.obstacle_corners
 
+    def stop(self):
+        """Stop all threads and release resources"""
+        self.stop_event.set()
+        self.camera_feed.stop()
+        self.camera_feed.join()
+        cv2.destroyAllWindows()
 
 
 def main():
-    """Point d'entrée principal"""
-    vision = Analysis()
-    if not vision.initialize_camera(cam_port=4):
-        print("Erreur : Impossible d'initialiser la caméra.")
+    """Main entry point for the Vision system."""
+    # Create an instance of the Vision system
+    vision_system = Vision(cam_port=4)  # Specify the camera port if necessary
+
+    # Initialize the system (camera, threads, etc.)
+    if not vision_system.initialize_system():
+        print("Failed to initialize the Vision system. Exiting...")
         return
 
-    camera_thread = CameraFeed(vision)
-    camera_thread.start()
-
     try:
-        while True:
-            # Vous pouvez exécuter d'autres tâches en parallèle ici
-            # Le programme principal continue de tourner sans bloquer l'affichage
-            print("Le programme principal fonctionne en arrière-plan...")
-            time.sleep(1)
+        # Run the Vision system, which continuously processes frames
+        print("Starting the Vision system. Press 'q' to quit.")
+        vision_system.run()
     except KeyboardInterrupt:
-        print("Arrêt du programme demandé.")
+        print("Keyboard interrupt detected. Stopping the Vision system...")
     finally:
-        camera_thread.stop()
-        camera_thread.join()
-        print("Programme terminé.")
+        # Ensure the system is stopped and cleaned up
+        vision_system.stop()
+        print("Vision system has stopped cleanly.")
+
+    # """Point d'entrée principal"""
+    # vision = Analysis()
+    # if not vision.initialize_camera(cam_port=4):
+    #     print("Erreur : Impossible d'initialiser la caméra.")
+    #     return
+
+    # camera_thread = CameraFeed(vision)
+    # camera_thread.start()
+
+    # try:
+    #     while True:
+    #         # Vous pouvez exécuter d'autres tâches en parallèle ici
+    #         # Le programme principal continue de tourner sans bloquer l'affichage
+    #         print("Le programme principal fonctionne en arrière-plan...")
+    #         time.sleep(1)
+    # except KeyboardInterrupt:
+    #     print("Arrêt du programme demandé.")
+    # finally:
+    #     camera_thread.stop()
+    #     camera_thread.join()
+    #     print("Programme terminé.")
 
 
 if __name__ == "__main__":
