@@ -53,7 +53,7 @@ class VisionModule:
     def __init__(self, image=None, map_size=(1000,1000)):
         self.cam = None
         self.frame = image  #this should always contain the original, unaltered image
-        self.frame_viz = None  #this is where the original frame WITH annotations should be
+        self.frame_viz = image  #this is where the original frame WITH annotations should be
         self.top_view = None   #this is where the top-view visualization should be
         #dim 0 is which corner (0,1,2,3 = tl,tr,br,bl), dim1 is x or y
         self.map_corners = np.ones((4,2),dtype='int32')*(-1)
@@ -282,9 +282,15 @@ class VisionModule:
     
     def get_6_markers(self,img):
         '''Find 6 markers and return 3D array of them sorted in the order :
-        [TL, TR, BR, BL, Thymio, Goal]. Dim1 is markers, dim2 is corners of the marker
-        dim3 is x and y of the corner'''
+        markers = [TL, TR, BR, BL, Thymio, Goal]. Dim1 is markers, dim2 is corners of the marker
+        dim3 is x and y of the corner. Also returns ids, which is an array telling which markers
+        have been detected. For ex, if ids=[0,2,3,5], it means that markers=[TL, BR,BL, GOAL] 
+        If no markers detected, both ids and markers = None
+        '''
         markers, ids = self.detect_aruco(img)
+        if ids is None:
+            print("NO MARKERS DETECTED")
+            return None, None
         print(f"Detected {len(ids)} markers : {list(squeeze(ids))}")
         if markers.shape == (0,):
             return squeeze(markers), squeeze(ids)
@@ -442,15 +448,17 @@ class VisionModule:
     #    return np.array([x,y,0], dtype='int32')
 
     def detect_thymio_pose(self,thymio_marker):
-        '''Returns integer position array [x,y,z=0] and float theta corresponding to Thymio position and orientation '''
+        '''Returns [x,y,theta] of the thymio marker center. X and Y would be int, theta float'''
         if thymio_marker is not None:
             x,y,theta = self.find_marker_center_and_orientation(thymio_marker)
             # we return the position and orientation of the thymio
             self.last_thymio_pose = tuple((x,y,theta))
-            return np.array([x,y], dtype='int32'), theta
+            #return np.array([x,y], dtype='int32'), theta
+            return [x,y,theta]
         
         x,y,theta = self.last_thymio_pose
-        return np.array([x,y], dtype='int32'), theta
+        #return np.array([x,y], dtype='int32'), theta
+        return [x,y,theta]
     
 
 
@@ -460,9 +468,11 @@ class VisionModule:
             x,y,_ = self.find_marker_center_and_orientation(goal_marker)
             # we return the position of the goal
             self.last_goal_position = tuple((x,y))
-            return np.array([x,y], dtype='int32')
+            #return np.array([x,y], dtype='int32')
+            return [x,y]
         x,y,_ = self.find_marker_center_and_orientation(goal_marker)
-        return np.array([x,y], dtype='int32')
+        #return np.array([x,y], dtype='int32')
+        return [x,y]
     
     def get_2_markers(self, top_view_img):
         """
@@ -470,10 +480,19 @@ class VisionModule:
         """
         markers, ids = self.detect_aruco(top_view_img)
 
-        # Verify that we have at least the two desired markers
-        if not (len(ids) >= 2):
-            print(f"(Find 2 marker) Detected {len(ids)} markers instead of at least 2.")
-            #return markers.squeeze(), ids.squeeze()
+        #if no markers have been detected
+        if ids == None:
+            print("(get_2_markers) Thymio and Goal markers not detected")
+            return None, None
+        else:
+            # # Verify that we have at least the two desired markers
+            # if not (len(ids) >= 2):
+            #     print(f"(get_2_markers) Detected {len(ids)} markers instead of at least 2.")
+            #     #return markers.squeeze(), ids.squeeze()
+            if not(4 in ids):
+                print("get_2_markers) Thymio not detected")
+            if not(5 in ids):
+                print("(get_2_markers) Goal not detected")
 
         # Identify markers by their IDs: assume Thymio (e.g., ID=4) and Goal (e.g., ID=5)
         thymio_marker = None
@@ -484,11 +503,11 @@ class VisionModule:
             elif marker_id == 5:  # Replace '5' with the actual ID for Goal
                 goal_marker = marker
 
-        if thymio_marker is None:
-            print("Unable to detect Thymio.")
-            #return False
-        if goal_marker is None:
-            print("Unable to detect the Goal marker.")
+        # if thymio_marker is None:
+        #     print("Unable to detect Thymio.")
+        #     #return False
+        # if goal_marker is None:
+        #     print("Unable to detect the Goal marker.")
             #return False
         return thymio_marker, goal_marker
 
@@ -503,6 +522,16 @@ class VisionModule:
         #get location of 6 markers (and their ids) in camera frame
         #NB this function, and all the rest, *should* still work if some markers aren't detected
         markers, ids = self.get_6_markers(img)
+
+        if ids is None:   #if no markers have been detected
+            if np.any(self.map_corners == -1): #and one of the 4 corners has not been initialized yet (default value [-1,-1])
+                self.top_view = img            #just return the original image
+                return 
+            #if all 4 corners have been detected previously, use their previous value to get the top view
+            corners = self.map_corners
+            self.top_view, _ = self.four_point_transform(img, corners)
+            return
+
         #find the coordinates of the 4 map corners (4x2 array).
         corners = self.get_map_corners(markers, ids)
         top_view_img, four_point_matrix = self.four_point_transform(img,corners)
@@ -568,22 +597,47 @@ class CameraFeedThread(threading.Thread):
                 # Appeler la méthode pour détecter les coins des obstacles
 
                 self.vision_module.julien_main(frame)
+                if self.vision_module.frame_viz is None:
+                    self.vision_module.frame_viz = frame
                 annotated_img = self.vision_module.frame_viz
                 top_view = self.vision_module.top_view
 
+                #output variables : 
+                # - [x,y,theta] of thymio - [x,y] of goal   -list of obstacle corners (list of list ?)
+                #if they have not been detected, will return None
+                robot_pose = [None,None,None]
+                goal_position = [None,None]
+
+
+                #! alternative : if not detected, will return last known pose and goal instead
+                #! Julien thinks it's not a good idea
+                # robot_pose = self.vision_module.last_thymio_pose
+                # goal_position = self.vision_module.last_goal_pos
+
+
                 Thymio_marker, goal_marker = self.vision_module.get_2_markers(top_view)
-                robot_position, theta = self.vision_module.detect_thymio_pose(Thymio_marker)
-                goal_position = self.vision_module.detect_goal_position(goal_marker)
+                if Thymio_marker is not None: 
+                    robot_pose= self.vision_module.detect_thymio_pose(Thymio_marker)  
+
+                    arrow_length = 100
+                    # Calculate the end point of the arrow using the angle theta
+                    end_x = int(robot_pose[0] + arrow_length * np.cos(robot_pose[2]))
+                    end_y = int(robot_pose[1] + arrow_length * np.sin(robot_pose[2]))
+                    top_view = cv2.arrowedLine(top_view, np.array(robot_pose[:2],dtype='int32'), (end_x, end_y), (0, 0, 255), 5)
+                else:
+                    print("Thymio not detected")
+           
+                if goal_marker is not None:
+                    goal_position = self.vision_module.detect_goal_position(goal_marker)
+                    if Thymio_marker is not None:
+                        top_view = cv2.arrowedLine(top_view, np.array(robot_pose[:2],dtype='int32'), np.array(goal_position, dtype='int32'), (255, 0, 0), 8)
+                else:
+                    print("Goal not detected")
 
                 obstacle_corners, img_with_polygons = self.vision_module.detect_obstacle_corners(top_view)
 
-                arrow_length = 100
-                # Calculate the end point of the arrow using the angle theta
-                end_x = int(robot_position[0] + arrow_length * np.cos(theta))
-                end_y = int(robot_position[1] + arrow_length * np.sin(theta))
-                top_view = cv2.arrowedLine(top_view, robot_position, (end_x, end_y), (0, 0, 255), 5)
-                top_view = cv2.arrowedLine(top_view, robot_position, goal_position, (255, 0, 0), 8)
 
+                
                 # Afficher les deux images en parallèle
                 show_many_img([frame, img_with_polygons, annotated_img, top_view], ["Original", "Processed_with_polygones", "Highlighting corners", "thymio Oop, baby"])
 
@@ -600,7 +654,7 @@ class CameraFeedThread(threading.Thread):
 def main():
     """Point d'entrée principal"""
     vision = VisionModule()
-    if not vision.initialize_camera(cam_port=4):
+    if not vision.initialize_camera(cam_port=0):
         print("Erreur : Impossible d'initialiser la caméra.")
         return
 
