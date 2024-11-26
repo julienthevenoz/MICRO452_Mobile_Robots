@@ -49,7 +49,7 @@ def show_img(img, title):
     cv2.imshow(title, img)
 
 class Analysis:
-    """Module de gestion de la caméra et analyse d'image"""
+    """Class to process frames and perform analysis"""
     def __init__(self, image=None, map_size=(1000,1000)):
         self.cam = None
         self.frame = image  #this should always contain the original, unaltered image
@@ -61,29 +61,6 @@ class Analysis:
         self.last_thymio_pose = None
         self.last_goal_pos = None
 
-    def initialize_camera(self, cam_port=0):
-        """Initialise la caméra"""
-        self.cam = cv2.VideoCapture(cam_port)
-        if not self.cam.isOpened():
-            print(f"Impossible d'ouvrir la caméra sur le port {cam_port}")
-            return False
-        print(f"Caméra initialisée sur le port {cam_port}")
-        return True
-
-    def capture_frame(self):
-        """Capture une image de la caméra"""
-        if not self.cam or not self.cam.isOpened():
-            print("La caméra n'est pas initialisée.")
-            return None
-
-        ret, frame = self.cam.read()
-        if not ret:
-            print("Échec de la capture d'image.")
-            return None
-
-        self.frame = frame
-        return frame
-    
     def distance(self, p1, p2):
         """Calcul de la distance euclidienne entre deux points"""
         return np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
@@ -519,23 +496,41 @@ class Analysis:
         return 
 
 
+
 class CameraFeed(threading.Thread):
-    """Thread pour capturer et afficher un flux vidéo constant"""
-    def __init__(self, vision_module):
+    """Thread to continuously capture frames from a video source"""
+    def __init__(self):
         super().__init__()
-        self.vision_module = vision_module
         self.stop_event = threading.Event()
-        self.robot_pose = []
-        self.goal_position = []
-        self.obstacle_corners = []
+        self.frame = None
+        self.cam = None
+        #self.robot_pose = []
+        #self.goal_position = []
+        #self.obstacle_corners = []
 
-    def get_thymio_goal_and_obstacles(self):
-        '''Returns [x,y,theta] of thymio, [x,y] of goal and list of obstacle 
-        corners = [[corner1,corner2],[corner1,corner2,corner3,corner4],[corner1,corner2,corner3]]
-        where cornerX is itself a list of two coordinates [x_corner1,y_corner1].
-        If the corresponding markers are not detected, returns empty lists []'''
-        return self.robot_pose, self.goal_position, self.obstacle_corners
+    def initialize_camera(self, cam_port=0):
+        """Initialize the camera"""
+        self.cam = cv2.VideoCapture(cam_port)
+        if not self.cam.isOpened():
+            print(f"Unable to open the camera on port {cam_port}")
+            return False
+        print(f"Camera initialized on port {cam_port}")
+        return True
 
+    def capture_frame(self):
+        """Return the most recently captured frame"""
+        if not self.cam or not self.cam.isOpened():
+            print("Camera not initialised")
+            return None
+
+        ret, frame = self.cam.read()
+        if not ret:
+            print("Failed to capture image")
+            return None
+
+        self.frame = frame
+        return frame
+    
     def run(self):
         while not self.stop_event.is_set():
             frame = self.vision_module.capture_frame()
@@ -602,13 +597,24 @@ class CameraFeed(threading.Thread):
         self.stop_event.set()
         self.vision_module.release_camera()
 
+
+
 class Vision():
-    """Thread pour capturer et afficher un flux vidéo constant"""
+    """Main class to coordinate CameraFeed and Analysis"""
     def __init__(self):
     # Instantiate CameraFeed and Analysis
         self.camera_feed = CameraFeed()
         self.analysis = Analysis()
         self.stop_event = threading.Event()
+
+    def get_thymio_goal_and_obstacles(self):
+        '''Returns [x,y,theta] of thymio, [x,y] of goal and list of obstacle 
+        corners = [[corner1,corner2],[corner1,corner2,corner3,corner4],[corner1,corner2,corner3]]
+        where cornerX is itself a list of two coordinates [x_corner1,y_corner1].
+        If the corresponding markers are not detected, returns empty lists []'''
+        return self.robot_pose, self.goal_position, self.obstacle_corners
+
+
 
 def main():
     """Point d'entrée principal"""
