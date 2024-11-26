@@ -48,7 +48,7 @@ def show_img(img, title):
     cv2.namedWindow(title, cv2.WINDOW_NORMAL)
     cv2.imshow(title, img)
 
-class VisionModule:
+class Analysis:
     """Module de gestion de la caméra et analyse d'image"""
     def __init__(self, image=None, map_size=(1000,1000)):
         self.cam = None
@@ -320,6 +320,7 @@ class VisionModule:
             return tr
         
         #we're gonna calculate the interception of the diagonals to find the center
+        tl,tr,br,bl = marker
         alpha = (tr[1] - bl[1]) / (tr[0]-bl[0]) #slope of bl->tr diagonal is : delta_y / delta_x = y2-y4 / x2-x4
         beta = (tl[1]-br[1]) / (tl[0] - br[0]) #slope of br->tl diagonal is y1-y3 / x1 - x3
         #if you find the slope and intercept of each diagonal, equate them and isolate x, you get this
@@ -518,7 +519,7 @@ class VisionModule:
         return 
 
 
-class CameraFeedThread(threading.Thread):
+class CameraFeed(threading.Thread):
     """Thread pour capturer et afficher un flux vidéo constant"""
     def __init__(self, vision_module):
         super().__init__()
@@ -539,7 +540,7 @@ class CameraFeedThread(threading.Thread):
         while not self.stop_event.is_set():
             frame = self.vision_module.capture_frame()
             if frame is not None:
-                # Utilisation de la méthode d'analyse de VisionModule
+                # Utilisation de la méthode d'analyse de Analysis
                 #processed_frame = self.vision_module.analyze_frame(frame)
                 # Appeler la méthode pour détecter les coins des obstacles
 
@@ -601,15 +602,22 @@ class CameraFeedThread(threading.Thread):
         self.stop_event.set()
         self.vision_module.release_camera()
 
+class Vision():
+    """Thread pour capturer et afficher un flux vidéo constant"""
+    def __init__(self):
+    # Instantiate CameraFeed and Analysis
+        self.camera_feed = CameraFeed()
+        self.analysis = Analysis()
+        self.stop_event = threading.Event()
 
 def main():
     """Point d'entrée principal"""
-    vision = VisionModule()
+    vision = Analysis()
     if not vision.initialize_camera(cam_port=4):
         print("Erreur : Impossible d'initialiser la caméra.")
         return
 
-    camera_thread = CameraFeedThread(vision)
+    camera_thread = CameraFeed(vision)
     camera_thread.start()
 
     try:
