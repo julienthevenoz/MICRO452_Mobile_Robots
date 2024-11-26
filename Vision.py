@@ -654,7 +654,7 @@ class CameraFeedThread(threading.Thread):
 def main():
     """Point d'entrée principal"""
     vision = VisionModule()
-    if not vision.initialize_camera(cam_port=0):
+    if not vision.initialize_camera(cam_port=4):
         print("Erreur : Impossible d'initialiser la caméra.")
         return
 
