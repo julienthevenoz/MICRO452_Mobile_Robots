@@ -1,4 +1,4 @@
-class global_navigation:
+class GlobalNavigation:
   '''
   Could use some existing libraries: pyvisgraph
   Input: start_point, end_point, obstacles(get from visual module)
@@ -6,6 +6,6 @@ class global_navigation:
   '''
   def __init__(self):
 
-  def shortest_path(self,start, goal):
-    
+  def shortest_path(self,thymio, goal, obstacles):
+    path = [0, 0, 0, 0,]
     return path
