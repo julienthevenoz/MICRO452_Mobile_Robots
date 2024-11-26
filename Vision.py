@@ -16,7 +16,7 @@ def show_many_img(img_list, title_list):
         cv2.imshow(title_list[i], img_list[i])
 
 def squeeze(iterable,type=None):
-        '''Reduces the dimension of list,tuple or array and (optional) changes its datatype.
+        '''Reduces the dimension of list, tuple or array and (optional) changes its datatype.
         Always returns a numpy array of dimension 1 at mininum (no scalar)'''
         #so for example if you a the list of tuples with useless dimensions [ [ [(a,b)] , [(a,b)] ] ]
         #it returns the array [ [a,b] , [a,b] ]
@@ -304,7 +304,6 @@ class VisionModule:
    
         return squeeze(markers) , squeeze(ids)
     
-
     def find_marker_center_and_orientation(self, marker):
         '''Returns the center point of four coordinates (must be given
         in TL,TR,BR,BL order) and its orientation as an array of int'''
@@ -387,7 +386,6 @@ class VisionModule:
         # return the warped image
         return warped, M
 
-    
     def rescale_points(self,pts):
         '''Takes a list of points given in pixel coordinates of the original image and 
         rescale them according to our map coordinates'''
@@ -428,26 +426,6 @@ class VisionModule:
 
         print(f"{len(corners)} detected corners, {in_memory} corners stored")
 
-        
-
-    #def detect_thymio_pose(self, markers, ids):
-    #    '''Returns integer position array [x,y,z=0] and float theta corresponding to Thymio position and orientation '''
-    #    thymio_id = 4
-    #    if not(thymio_id in ids):
-    #        print("Thymio marker not detcted")
-    #        return None, None
-    #    thymio_marker = markers[np.where(ids == thymio_id)[0][0]] #get the thymio_marker
-    #    x,y,theta = self.find_marker_center_and_orientation(thymio_marker)
-    #    #we return the position and angle
-    #    return np.array([x,y,0], dtype='int32'), theta 
-    
-
-    #def detect_goal_position(self, markers):
-    #    ''' Return int array [x,y,z=0] corresponding to goal position'''
-    #    goal_marker = markers[5]
-    #    x,y,_ = self.find_marker_center_and_orientation(goal_marker)
-    #    return np.array([x,y,0], dtype='int32')
-
     def detect_thymio_pose(self,thymio_marker):
         '''Returns [x,y,theta] of the thymio marker center. X and Y would be int, theta float'''
         if thymio_marker is not None:
@@ -460,8 +438,6 @@ class VisionModule:
         x,y,theta = self.last_thymio_pose
         #return np.array([x,y], dtype='int32'), theta
         return [x,y,theta]
-    
-
 
     def detect_goal_position(self, goal_marker):
         ''' Return int array [x,y,z=0] corresponding to goal position'''
@@ -482,7 +458,7 @@ class VisionModule:
         markers, ids = self.detect_aruco(top_view_img)
 
         #if no markers have been detected
-        if ids == None:
+        if ids is None:
             print("(get_2_markers) Thymio and Goal markers not detected")
             return None, None
         else:
@@ -492,8 +468,10 @@ class VisionModule:
             #     #return markers.squeeze(), ids.squeeze()
             if not(4 in ids):
                 print("get_2_markers) Thymio not detected")
+                return None, markers
             if not(5 in ids):
                 print("(get_2_markers) Goal not detected")
+                return markers, None
 
         # Identify markers by their IDs: assume Thymio (e.g., ID=4) and Goal (e.g., ID=5)
         thymio_marker = None
@@ -514,11 +492,6 @@ class VisionModule:
 
     def julien_main(self, img):
         ''' ThIS SHOULD NOT STAY ! I only put it as an example of how my code is supposed to be used '''
-        # visio = VisionModule()
-        # visio.initialize_camera(cam_port=4)
-        # ### take a photo with Tifaine's code, or open an already existing photo
-        # filename = 'Photos/Photo7.jpg'
-        # img = cv2.imread(filename, cv2.IMREAD_COLOR)
 
         #get location of 6 markers (and their ids) in camera frame
         #NB this function, and all the rest, *should* still work if some markers aren't detected
@@ -538,48 +511,6 @@ class VisionModule:
         top_view_img, four_point_matrix = self.four_point_transform(img,corners)
         self.top_view = top_view_img
         return 
-        thymio_pose, thymio_theta = self.detect_thymio_pose(markers, ids)
-        goal_pos = self.detect_goal_position(markers)
-    
-        #let's put a green circle on top of the goal
-        annotated_OG_img = cv2.circle(img.copy(), goal_pos[:2], 20, (0,255,0), 5)
-        #let's draw an arrow from the center of the thymio in the direction where it's looking
-        arrow_length = 100 #in pixels
-        start = thymio_pose[:2]
-        end = (int(start[0] + arrow_length*np.cos(thymio_theta)), int(start[1] + arrow_length*np.sin(thymio_theta)))
-        end = start + (arrow_length*np.cos(thymio_pose[2]),arrow_length*np.sin(thymio_pose[2]))
-        annotated_OG_img = cv2.arrowedLine(annotated_OG_img,start, end, (255,0,0), 20)
-        #let's put a green circle on top of the goal
-        annotated_OG_img = cv2.circle(annotated_OG_img, goal_pos[:2], 20, (0,255,0), 5)
-        # show_img(annotated_OG_img,'OG image')
-        # self.frame_viz = annotated_OG_img
-
-         #use the 4 corner coordinates to do a perspective transform (correct, flatten, crop) on the map corners
-        top_view_img, four_point_matrix = self.four_point_transform(img,corners)
-        self.top_view = top_view_img
-        #draw the circle and arrow on the transformed image too
-        #!NB : THIS CODE IS PROBABLY NOT WORKING ! BUT ZHUORAN FIXED IT ?
-        new_thymio = four_point_matrix @ thymio_pose
-        new_thymio_angle = thymio_theta - (np.pi)/2
-        new_goal = (four_point_matrix @ goal_pos).astype('int32')
-        annotated_top_view = cv2.circle(top_view_img.copy(), new_goal[:2], 20, (0,255,0), 5)
-        start = np.array(new_thymio[:2]).astype(int)
-        end = (int(start[0] + arrow_length*np.cos(thymio_theta)), int(start[1] + arrow_length*np.sin(thymio_theta)))
-        annotated_top_view = cv2.arrowedLine(annotated_top_view,start, end, (255,0,0), 20) #the angle should be off
-        # show_img(annotated_top_view, 'top view visulazation')
-
-        #convert all coordinates to our "imaginary" map coordinates
-        #! NB : this only needs the original camera frame coordinates, the 4 points transform and so on
-        #! is only there for visualisation
-        pts = self.rescale_points([*corners, thymio_pose[:2], goal_pos])
-        *r_corners, r_thymio, r_goal = pts
-        r_goal = np.array(r_goal).astype(int)
-        imaginary_coordinates = cv2.circle(top_view_img.copy(), r_goal, 20, (0,255,0), 5)
-        imaginary_coordinates = cv2.circle(imaginary_coordinates, r_thymio, 20, (255,0,0))
-        print(0)
-
-        return annotated_OG_img
-
 
 
 class CameraFeedThread(threading.Thread):
@@ -598,7 +529,6 @@ class CameraFeedThread(threading.Thread):
         where cornerX is itself a list of two coordinates [x_corner1,y_corner1].
         If the corresponding markers are not detected, returns empty lists []'''
         return self.robot_pose, self.goal_position, self.obstacle_corners
-
 
     def run(self):
         while not self.stop_event.is_set():
@@ -698,7 +628,7 @@ if __name__ == "__main__":
 
 ##################################################################
 ##################################################################
-""""
+"""
 
 class Vision_module():
     
@@ -731,31 +661,4 @@ class Vision_module():
         #cv2.circle(modified_img, tymio_position, tymio_radius, (255, 255, 255), -1)  # Blanc pour le Tymio
         
         return modified_img
-
-if __name__ == "__main__":
-    filename = 'Photos/tymio_islands.jpg'
-
-    img = cv2.imread(filename, cv2.IMREAD_COLOR)
-    # Vérifier si l'image est correctement chargée
-    if img is None:
-        print("Erreur lors du chargement de l'image")
-        exit()
-
-    # Créer une instance de Vision_module
-    visio = Vision_module()
-
-    # Appeler la méthode pour détecter les coins des obstacles
-    obstacle_corners, img_with_polygons = visio.detect_obstacle_corners(img)
-    
-    # Optionnellement, afficher l'image finale avec les polygones détectés
-    cv2.imshow("Polygones et coins", img_with_polygons)
-    cv2.waitKey(0)
-
-     ##### FUN #####
-    #modified_img = visio.modify_image_for_visualization(img_with_polygons, obstacle_corners, (210,520)) ##### METTRE LES BON COORDONNEE DU TYMIO #####
-    #cv2.imshow("Modified Image", modified_img)
-    #cv2.waitKey(0)
-
-    cv2.destroyAllWindows()
-
 """
