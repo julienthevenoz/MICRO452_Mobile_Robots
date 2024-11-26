@@ -307,8 +307,19 @@ class VisionModule:
     def find_marker_center_and_orientation(self, marker):
         '''Returns the center point of four coordinates (must be given
         in TL,TR,BR,BL order) and its orientation as an array of int'''
-        #we're gonna calculate the interception of the diagonals to find the center
+        
         tl,tr,br,bl = marker
+        
+        #find orientation of the marker
+        theta = np.arctan2((tr[1]-br[1]), (tr[0]-br[0]))
+
+        if (tr[0]-bl[0]) == 0 or (tl[0] - br[0]) == 0: 
+        #! To prevent a divison by 0, if for some unholy reason the diag distance is 0, we don't try to calculate the center 
+        #! and always return the top right corner. This is not ideal but prevents a crash
+            print("(find_marker_center_and_orientation) Division by 0 : returning tr instead of center")
+            return tr
+        
+        #we're gonna calculate the interception of the diagonals to find the center
         alpha = (tr[1] - bl[1]) / (tr[0]-bl[0]) #slope of bl->tr diagonal is : delta_y / delta_x = y2-y4 / x2-x4
         beta = (tl[1]-br[1]) / (tl[0] - br[0]) #slope of br->tl diagonal is y1-y3 / x1 - x3
         #if you find the slope and intercept of each diagonal, equate them and isolate x, you get this
@@ -316,12 +327,6 @@ class VisionModule:
         x_center = (tl[1] - tr[1] - beta*tl[0] + alpha*tr[0]) / (alpha - beta)  
         y_center = alpha*x_center + (tr[1] - alpha*tr[0]) # use the equation of the bl->tr diagonal to find y_center
 
-        #now we will use the dot product to find the relative angle between the top side of the marker (tl->tr) and the horizontal
-        # top_side = np.array([tr[0]-br[0],tr[1]-br[1]])
-        # top_side = top_side / np.linalg.norm(top_side) #normalize the vector
-        # unit_hvec = np.array([1,0])  #unitary horizontal vector
-        # theta = np.arccos(np.dot(top_side,unit_hvec)) # v1 dot v2 = ||v1||*||v2||*cos(theta) = cos(theta) if vects are unitary
-        theta = np.arctan2((tr[1]-br[1]), (tr[0]-br[0]))
         return x_center,y_center, theta
     
     def get_map_corners(self,markers, ids):
