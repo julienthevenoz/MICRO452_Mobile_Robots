@@ -58,8 +58,10 @@ class VisionModule:
         #dim 0 is which corner (0,1,2,3 = tl,tr,br,bl), dim1 is x or y
         self.map_corners = np.ones((4,2),dtype='int32')*(-1)
         self.map_size = map_size  #arbitrary chosen metric of our map
-        self.last_thymio_pose = None
-        self.last_goal_pos = None
+        self.last_thymio_marker = None ##### test ####
+        self.last_goal_marker = None ##### test ####
+        self.last_thymio_pose = None #(np.array([0,0], dtype='int32'), 0)
+        self.last_goal_pos = None #(np.array([0,0], dtype='int32'))
 
     def initialize_camera(self, cam_port=0):
         """Initialise la caméra"""
@@ -444,26 +446,36 @@ class VisionModule:
     def detect_thymio_pose(self,thymio_marker):
         '''Returns integer position array [x,y,z=0] and float theta corresponding to Thymio position and orientation '''
         if thymio_marker is not None:
+            self.last_thymio_pose = thymio_marker
             x,y,theta = self.find_marker_center_and_orientation(thymio_marker)
             # we return the position and orientation of the thymio
-            self.last_thymio_pose = tuple((x,y,theta))
             return np.array([x,y], dtype='int32'), theta
         
-        x,y,theta = self.last_thymio_pose
-        return np.array([x,y], dtype='int32'), theta
+        if self.last_thymio_marker is not None:
+            print("Use of the last position of the Thymio ")
+            x,y,theta = self.find_marker_center_and_orientation(self.last_thymio_marker)
+            return np.array([x,y], dtype='int32'), theta
+        
+        print("Thymio position unknown, return default value")
+        return np.array([0, 0], dtype='int32'), 0.0
     
-
 
     def detect_goal_position(self, goal_marker):
         ''' Return int array [x,y,z=0] corresponding to goal position'''
         if goal_marker is not None:
+            self.last_goal_position = goal_marker
             x,y,_ = self.find_marker_center_and_orientation(goal_marker)
             # we return the position of the goal
-            self.last_goal_position = tuple((x,y))
             return np.array([x,y], dtype='int32')
-        x,y,_ = self.find_marker_center_and_orientation(goal_marker)
-        return np.array([x,y], dtype='int32')
+        
+        if self.last_goal_marker is not None:
+            x,y,_ = self.find_marker_center_and_orientation(self.last_goal_marker)
+            return np.array([x,y], dtype='int32')
+        
+        print("Goal position unknown, return default value")
+        return np.array([0, 0], dtype='int32')
     
+
     def get_2_markers(self, top_view_img):
         """
         Find 2 markers (Thymio and Goal) in the top-view image
@@ -490,6 +502,18 @@ class VisionModule:
         if goal_marker is None:
             print("Unable to detect the Goal marker.")
             #return False
+
+        #save the states : Gestion des cas où les marqueurs ne sont pas détectés
+        if thymio_marker is not None:
+            self.last_thymio_marker = thymio_marker
+        else:
+            thymio_marker = self.last_thymio_marker
+
+        if goal_marker is not None:
+            self.last_goal_marker = goal_marker
+        else:
+            goal_marker = self.last_goal_marker
+
         return thymio_marker, goal_marker
 
     def julien_main(self, img):
@@ -572,6 +596,12 @@ class CameraFeedThread(threading.Thread):
                 top_view = self.vision_module.top_view
 
                 Thymio_marker, goal_marker = self.vision_module.get_2_markers(top_view)
+
+                # Verification
+                if Thymio_marker is None or goal_marker is None:
+                    print("Un ou plusieurs marqueurs manquent, utilisation des derniers états connus")
+                    #continue
+
                 robot_position, theta = self.vision_module.detect_thymio_pose(Thymio_marker)
                 goal_position = self.vision_module.detect_goal_position(goal_marker)
 
