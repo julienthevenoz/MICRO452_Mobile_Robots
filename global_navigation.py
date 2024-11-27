@@ -1,16 +1,3 @@
-<<<<<<< HEAD
-class GlobalNavigation:
-  '''
-  Could use some existing libraries: pyvisgraph
-  Input: start_point, end_point, obstacles(get from visual module)
-  Output: shortest path
-  '''
-  def __init__(self):
-
-  def shortest_path(self,thymio, goal, obstacles):
-    path = [0, 0, 0, 0,]
-    return path
-=======
 import cv2
 import numpy as np
 from shapely.geometry import LineString, Polygon
@@ -130,9 +117,3 @@ class global_navigation():
         print("Shortest Path:", shortest_path)
         print(shortest_path[1][1])
         print("Path Distance:", path_distance)
-
-
-
-
-
->>>>>>> cfe62d4d780d487184f5cecf24c9e73f5e63b604
