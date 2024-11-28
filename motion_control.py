@@ -56,7 +56,6 @@ class MotionControl:
     else:
       self.thymio.set_motor_speed(30, 30)
 
-
   def move_to_next(self, current_pos, goal_pos, current_angle):
     '''
       caculate the speed based on current position and goal position
@@ -89,9 +88,8 @@ class MotionControl:
     omega = self.Kb * angle_error
     v = max(-self.max_velocity, min(v, self.max_velocity))
     omega = max(-self.max_omega, min(omega, self.max_omega))
-    self.set_motor_speed(v+omega, v-omega)
+    self.set_motor_speed(v-omega, v+omega)
     return False
-
 
   def get_motor_speed(self):
     motor_speed = self.thymio.read_motors_speed()
