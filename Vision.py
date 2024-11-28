@@ -134,93 +134,85 @@ class Analysis:
 
     def detect_obstacle_corners(self, img):
         """
-        Détecte les bords des obstacles dans l'image, les approxime par des polygones,
-        et garde uniquement ceux dont la couleur moyenne est noire (obstacles).
+        Detects obstacle edges in the image, approximates them as polygons, 
+        and keeps only those with an average color that resembles black (obstacles).
+        Returns three outputs: the polygons, the binary obstacle mask, and the image with visualized polygons.
         """
-        # 1. Conversion de l'image en LAB pour une analyse des couleurs
+        # 1. Convert the image to LAB color space for color analysis
         lab_img = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
 
-        # 2. Calcul de l'histogramme de la composante L
+        # 2. Calculate the histogram of the L component
         hist = cv2.calcHist([lab_img[:, :, 0]], [0], None, [180], [0, 180])  # 180 bins for L in the range [0, 180]
-        signal = np.gradient(medfilt(hist.flatten(), 15))  # Filtrage médian pour lisser le signal
+        signal = np.gradient(medfilt(hist.flatten(), 15))  # Median filtering to smooth the signal
 
         grad_threshold = -10
         highest = 125
 
-        # 3. Recherche du seuil dans le signal
+        # 3. Search for the threshold in the signal
         crossing_index = -1
-        for i in range(highest - 1, 1, -1):  # Commence juste en dessous de 'highest' et recule
+        for i in range(highest - 1, 1, -1):  # Start just below 'highest' and move backwards
             if signal[i] < grad_threshold:
                 crossing_index = i
                 break
 
-        # Trouver le seuil
+        # Find the threshold
         if crossing_index != -1:
             print(f"The highest index where the signal crosses {grad_threshold} is {crossing_index}.")
         else:
             print(f"No crossing found before index {highest}.")
-        
+
         treshold = crossing_index
 
-        # 4. Créer un masque binaire en fonction du seuil
+        # 4. Create a binary mask based on the threshold
         mask = lab_img[:, :, 0] < treshold
         obstacles = np.uint8(mask * 255)
 
-        # 5. Traitement des composants connectés
-        COUNT = 2000  # Seuil minimum pour la taille des composants
+        # 5. Process connected components
+        COUNT = 2000  # Minimum size threshold for components
         num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(obstacles, connectivity=8)
         filtered_mask = np.zeros_like(obstacles)
-        
-        for i in range(1, num_labels):  # Ignorer le fond
+
+        for i in range(1, num_labels):  # Ignore background (label 0)
             if stats[i, cv2.CC_STAT_AREA] >= COUNT:
                 filtered_mask[labels == i] = 255
 
-        # 6. Opérations morphologiques pour lisser le masque
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))  # Kernel de dilatation
+        # 6. Morphological operations to smooth the mask
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))  # Structuring element for dilation
         filtered_mask = cv2.dilate(filtered_mask, kernel)
         filtered_mask = cv2.erode(filtered_mask, kernel)
 
-        # 7. Trouver les contours des obstacles
+        # 7. Find contours of the obstacles
         contours, _ = cv2.findContours(filtered_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        # 8. Liste pour stocker les coins des obstacles
+        # 8. List to store the corners of the obstacles
         obstacle_corners = []
 
-        # 9. Approximation des polygones
+        # 9. Approximate the contours as polygons
         for contour in contours:
-            epsilon = 0.02 * cv2.arcLength(contour, True)  # Précision de l'approximation
+            epsilon = 0.02 * cv2.arcLength(contour, True)  # Approximation precision
             approx = cv2.approxPolyDP(contour, epsilon, True)
 
-            # Ajouter les coins des polygones
+            # Add the corners of the polygons
             obstacle_corners.append(approx.reshape(-1, 2).tolist())
 
-        ## 10. Visualisation des résultats
-        #fig, ax = plt.subplots(1, 3, figsize=(15, 5))
-#
-        ## Plot 1: Image originale
-        #ax[0].imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))  # Conversion BGR en RGB pour matplotlib
-        #ax[0].set_title("Original Image")
-        #ax[0].axis("off")
-#
-        ## Plot 2: Histogramme des valeurs de L
-        #ax[1].plot(signal, color='orange', lw=2)
-        #ax[1].set_title("Histogram of L values")
-        #ax[1].set_xlabel("L Value")
-        #ax[1].set_ylabel("Frequency")
-        #ax[1].axvline(treshold, color='green', linestyle='--', label=f'Threshold = {treshold:.2f}')
-        #ax[1].grid(alpha=0.5)
-        #ax[1].legend()
-#
-        ## Plot 3: Masque binaire dilaté
-        #ax[2].imshow(filtered_mask, cmap='gray')
-        #ax[2].set_title("Dilated Binary Mask")
-        #ax[2].axis("off")
-#
-        #plt.tight_layout()
-        #plt.show()
+        # 10. Visualize the polygons with colored edges and circles at corners
+        img_with_polygons = img.copy()
 
-        # Retourner les polygones détectés et l'image filtrée
-        return obstacle_corners, filtered_mask
+        # Assign a unique color for each polygon
+        for i, polygon in enumerate(obstacle_corners):
+            # Random color for each polygon (BGR format)
+            color = np.random.randint(0, 256, 3).tolist()
+
+            # Draw the corners as red circles
+            for (x, y) in polygon:
+                cv2.circle(img_with_polygons, (x, y), 5, (0, 0, 255), -1)  # Red circles at corners
+
+            # Draw the polygon edges
+            polygon_array = np.array(polygon, dtype=np.int32)
+            cv2.drawContours(img_with_polygons, [polygon_array], -1, color, 2)  # Polygon edges with random color
+
+        # 11. Return the results: obstacle corners, binary mask, and image with visualized polygons
+        return obstacle_corners, filtered_mask, img_with_polygons
 
     def analyze_frame(self, frame):
         """
@@ -575,15 +567,15 @@ class CameraFeed(threading.Thread):
                 else:
                     print("Goal not detected")
 
-                obstacle_corners, img_with_polygons = self.vision_module.detect_obstacle_corners(top_view)
+                obstacle_corners, filtered_mask, img_with_polygons = self.vision_module.detect_obstacle_corners(top_view)
 
                 #update attributes
                 self.obstacle_corners = obstacle_corners
                 self.robot_pose = robot_pose
                 self.goal_position = goal_position
                 
-                videofeeds_list = [frame, img_with_polygons, annotated_img, top_view]
-                titles_list = ["Original", "Processed_with_polygones", "Highlighting corners", "thymio Oops, baby"]
+                videofeeds_list = [frame, filtered_mask, img_with_polygons, annotated_img, top_view]
+                titles_list = ["Original", "filtered_mask", "Processed_with_polygones", "Highlighting corners", "thymio Oops, baby"]
                 # Afficher les deux images en parallèle
                 if len(videofeeds_list) == len(self.show_which):
                     v_l, t_l = [], []
