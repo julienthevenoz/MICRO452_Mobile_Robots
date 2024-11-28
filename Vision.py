@@ -294,7 +294,7 @@ class Analysis:
         #! To prevent a divison by 0, if for some unholy reason the diag distance is 0, we don't try to calculate the center 
         #! and always return the top right corner. This is not ideal but prevents a crash
             print("(find_marker_center_and_orientation) Division by 0 : returning tr instead of center")
-            return tr
+            return *tr, theta
         
         #we're gonna calculate the interception of the diagonals to find the center
         tl,tr,br,bl = marker
