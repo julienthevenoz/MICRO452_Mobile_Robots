@@ -48,16 +48,16 @@ def show_img(img, title):
     cv2.namedWindow(title, cv2.WINDOW_NORMAL)
     cv2.imshow(title, img)
 
-class VisionModule:
+class Analysis:
     """Module de gestion de la caméra et analyse d'image"""
-    def __init__(self, image=None, map_size=(1000,1000)):
+    def __init__(self, image=None):
         self.cam = None
         self.frame = image  #this should always contain the original, unaltered image
         self.frame_viz = image  #this is where the original frame WITH annotations should be
         self.top_view = None   #this is where the top-view visualization should be
         #dim 0 is which corner (0,1,2,3 = tl,tr,br,bl), dim1 is x or y
         self.map_corners = np.ones((4,2),dtype='int32')*(-1)
-        self.map_size = map_size  #arbitrary chosen metric of our map
+        self.map_size = (600,300)  #arbitrary chosen metric of our map
         self.last_thymio_pose = None
         self.last_goal_pos = None
 
@@ -317,9 +317,10 @@ class VisionModule:
         #! To prevent a divison by 0, if for some unholy reason the diag distance is 0, we don't try to calculate the center 
         #! and always return the top right corner. This is not ideal but prevents a crash
             print("(find_marker_center_and_orientation) Division by 0 : returning tr instead of center")
-            return tr
+            return *tl, theta
         
         #we're gonna calculate the interception of the diagonals to find the center
+        tl,tr,br,bl = marker
         alpha = (tr[1] - bl[1]) / (tr[0]-bl[0]) #slope of bl->tr diagonal is : delta_y / delta_x = y2-y4 / x2-x4
         beta = (tl[1]-br[1]) / (tl[0] - br[0]) #slope of br->tl diagonal is y1-y3 / x1 - x3
         #if you find the slope and intercept of each diagonal, equate them and isolate x, you get this
@@ -379,6 +380,7 @@ class VisionModule:
         # (i.e. top-down view) of the image, again specifying points
         # in the top-left, top-right, bottom-right, and bottom-left
         # order
+        maxWidth, maxHeight = self.map_size
         dst = np.array([
             [0, 0],
             [maxWidth - 1, 0],
@@ -387,6 +389,7 @@ class VisionModule:
         # compute the perspective transform matrix and then apply it
         M = cv2.getPerspectiveTransform(pts.astype('float32'), dst)
         warped = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
+        # warped = cv2.putText(warped, f"{maxWidth} x {maxHeight}", (100,100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 3)
         self.highlight_corners(warped, dst)
         # return the warped image
         return warped, M
@@ -518,7 +521,7 @@ class VisionModule:
         return 
 
 
-class CameraFeedThread(threading.Thread):
+class CameraFeed(threading.Thread):
     """Thread pour capturer et afficher un flux vidéo constant"""
     def __init__(self, vision_module):
         super().__init__()
@@ -539,7 +542,7 @@ class CameraFeedThread(threading.Thread):
         while not self.stop_event.is_set():
             frame = self.vision_module.capture_frame()
             if frame is not None:
-                # Utilisation de la méthode d'analyse de VisionModule
+                # Utilisation de la méthode d'analyse de Analysis
                 #processed_frame = self.vision_module.analyze_frame(frame)
                 # Appeler la méthode pour détecter les coins des obstacles
 
@@ -601,15 +604,22 @@ class CameraFeedThread(threading.Thread):
         self.stop_event.set()
         self.vision_module.release_camera()
 
+class Vision():
+    """Thread pour capturer et afficher un flux vidéo constant"""
+    def __init__(self):
+    # Instantiate CameraFeed and Analysis
+        self.camera_feed = CameraFeed()
+        self.analysis = Analysis()
+        self.stop_event = threading.Event()
 
 def main():
     """Point d'entrée principal"""
-    vision = VisionModule()
+    vision = Analysis()
     if not vision.initialize_camera(cam_port=4):
         print("Erreur : Impossible d'initialiser la caméra.")
         return
 
-    camera_thread = CameraFeedThread(vision)
+    camera_thread = CameraFeed(vision)
     camera_thread.start()
 
     try:
