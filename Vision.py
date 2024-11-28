@@ -61,7 +61,7 @@ class Analysis:
         self.last_thymio_pose = None
         self.last_goal_pos = None
 
-    def initialize_camera(self, cam_port=0):
+    def initialize_camera(self, cam_port=4):
         """Initialise la caméra"""
         self.cam = cv2.VideoCapture(cam_port)
         if not self.cam.isOpened():
@@ -530,13 +530,14 @@ class CameraFeed(threading.Thread):
         self.robot_pose = []
         self.goal_position = []
         self.obstacle_corners = []
+        self.show_which = [1,1,1,1]
 
-    def get_thymio_goal_and_obstacles(self):
-        '''Returns [x,y,theta] of thymio, [x,y] of goal and list of obstacle 
-        corners = [[corner1,corner2],[corner1,corner2,corner3,corner4],[corner1,corner2,corner3]]
-        where cornerX is itself a list of two coordinates [x_corner1,y_corner1].
-        If the corresponding markers are not detected, returns empty lists []'''
-        return self.robot_pose, self.goal_position, self.obstacle_corners
+    # def get_thymio_goal_and_obstacles(self):
+    #     '''Returns [x,y,theta] of thymio, [x,y] of goal and list of obstacle 
+    #     corners = [[corner1,corner2],[corner1,corner2,corner3,corner4],[corner1,corner2,corner3]]
+    #     where cornerX is itself a list of two coordinates [x_corner1,y_corner1].
+    #     If the corresponding markers are not detected, returns empty lists []'''
+    #     return self.robot_pose, self.goal_position, self.obstacle_corners
 
     def run(self):
         while not self.stop_event.is_set():
@@ -592,8 +593,23 @@ class CameraFeed(threading.Thread):
                 self.robot_pose = robot_pose
                 self.goal_position = goal_position
                 
+                videofeeds_list = [frame, img_with_polygons, annotated_img, top_view]
+                titles_list = ["Original", "Processed_with_polygones", "Highlighting corners", "thymio Oops, baby"]
                 # Afficher les deux images en parallèle
-                show_many_img([frame, img_with_polygons, annotated_img, top_view], ["Original", "Processed_with_polygones", "Highlighting corners", "thymio Oop, baby"])
+                if len(videofeeds_list) == len(self.show_which):
+                    v_l, t_l = [], []
+                    for i in range(len(titles_list)):
+                        if self.show_which[i]:
+                            v_l.append(videofeeds_list[i])
+                            t_l.append(titles_list[i])
+                    videofeeds_list, titles_list = v_l, t_l
+                            
+                else:
+                    print(f"[Vision.camerafeed.run()] List of videofeeds must be {len(titles_list)}, not {len(show_which)}."\
+                          "Defaulting to show all")
+
+
+                show_many_img(videofeeds_list, titles_list)
 
                 # Quitter si la touche 'q' est pressée
                 if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -608,32 +624,58 @@ class Vision():
     """Thread pour capturer et afficher un flux vidéo constant"""
     def __init__(self):
     # Instantiate CameraFeed and Analysis
-        self.camera_feed = CameraFeed()
         self.analysis = Analysis()
-        self.stop_event = threading.Event()
+        self.camera_feed = CameraFeed(self.analysis)
+        # self.stop_event = threading.Event()
+
+
+    def begin(self, show_which=[1,1,1,1]):
+        if not self.analysis.initialize_camera(cam_port=0):
+            print("Erreur : Impossible d'initialiser la caméra.")
+            return
+        self.camera_feed.show_which = show_which
+        self.camera_feed.start()
+
+
+
+    def stop(self):
+        self.camera_feed.stop()
+
+    def get_thymio_goal_and_obstacles(self):
+        '''Returns [x,y,theta] of thymio, [x,y] of goal and list of obstacle 
+        corners = [[corner1,corner2],[corner1,corner2,corner3,corner4],[corner1,corner2,corner3]]
+        where cornerX is itself a list of two coordinates [x_corner1,y_corner1].
+        If the corresponding markers are not detected, returns empty lists []'''
+        robot_pose = self.camera_feed.robot_pose
+        goal_position = self.camera_feed.goal_position
+        obstacle_corners = self.camera_feed.obstacle_corners
+        return robot_pose, goal_position, obstacle_corners
+
 
 def main():
-    """Point d'entrée principal"""
-    vision = Analysis()
-    if not vision.initialize_camera(cam_port=4):
-        print("Erreur : Impossible d'initialiser la caméra.")
-        return
+    # """Point d'entrée principal"""
+    # vision = Analysis()
+    # if not vision.initialize_camera(cam_port=4):
+    #     print("Erreur : Impossible d'initialiser la caméra.")
+    #     return
 
-    camera_thread = CameraFeed(vision)
-    camera_thread.start()
+    # camera_thread = CameraFeed(vision)
+    # camera_thread.start()
 
-    try:
-        while True:
-            # Vous pouvez exécuter d'autres tâches en parallèle ici
-            # Le programme principal continue de tourner sans bloquer l'affichage
-            print("Le programme principal fonctionne en arrière-plan...")
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("Arrêt du programme demandé.")
-    finally:
-        camera_thread.stop()
-        camera_thread.join()
-        print("Programme terminé.")
+    # try:
+    #     while True:
+    #         # Vous pouvez exécuter d'autres tâches en parallèle ici
+    #         # Le programme principal continue de tourner sans bloquer l'affichage
+    #         print("Le programme principal fonctionne en arrière-plan...")
+    #         time.sleep(1)
+    # except KeyboardInterrupt:
+    #     print("Arrêt du programme demandé.")
+    # finally:
+    #     camera_thread.stop()
+    #     camera_thread.join()
+    #     print("Programme terminé.")
+    visio = Vision()
+    visio.begin()
 
 
 if __name__ == "__main__":
