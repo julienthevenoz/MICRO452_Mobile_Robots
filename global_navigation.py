@@ -73,26 +73,8 @@ class GlobalNavigation:
 
     return None, float("inf"), graph  # Return None if no path is found
 
-
-# Test function for the GlobalNavigation class
-if __name__ == "__main__":
-    # Define some obstacles
-    obstacles = [
-        [(2, 2), (4, 2), (4, 4), (2, 4)],  # Square obstacle
-        [(6, 6), (8, 6), (8, 8), (6, 8)]  # Another square obstacle
-    ]
-
-    # Start and goal points
-    start = (0, 0)
-    goal = (10, 10)
-
-    # Create an instance of the GlobalNavigation class
-    navigation = GlobalNavigation()
-
-    # Run Dijkstra's algorithm to find the shortest path
-    path, cost = navigation.dijkstra(start, goal, obstacles)
-
-    # Print results
+ def plot_path(self, goal_list, obstacles):
+  # Print results
     if path:
         print("Path found:", path)
         print("Total cost:", cost)
@@ -124,3 +106,25 @@ if __name__ == "__main__":
     ax.legend()
 
     plt.show()
+  
+
+# Test function for the GlobalNavigation class
+if __name__ == "__main__":
+    # Define some obstacles
+    # obstacles = [
+    #     [(2, 2), (4, 2), (4, 4), (2, 4)],  # Square obstacle
+    #     [(6, 6), (8, 6), (8, 8), (6, 8)]  # Another square obstacle
+    # ]
+    obstacles = []
+
+    # Start and goal points
+    start = (0, 0)
+    goal = (10, 10)
+
+    # Create an instance of the GlobalNavigation class
+    navigation = GlobalNavigation()
+
+    # Run Dijkstra's algorithm to find the shortest path
+    path, cost = navigation.dijkstra(start, goal, obstacles)
+
+    navigation.plot_path(goal, obstacles)
