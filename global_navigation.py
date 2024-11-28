@@ -11,16 +11,16 @@ from geopandas import GeoSeries
 class GlobalNavigation:
 
  def __init__(self):
-  self.margin = 0.2
+  self.margin = 0
             
 
  def getObstacles(self, start, goal, obstacles):
   obstacle_polygons = [Polygon(vertices) for vertices in obstacles]
   buffered_obstacles = [obstacle.buffer(self.margin, join_style = "mitre") for obstacle in obstacle_polygons]
-  all_vertices = [start, goal]
+  all_vertices = [tuple(start), tuple(goal)]
   for buffered_obstacle in buffered_obstacles:
             for coord in buffered_obstacle.exterior.coords:
-                all_vertices.append(coord)
+                all_vertices.append(tuple(coord))
   return obstacle_polygons, all_vertices
 
 
@@ -59,7 +59,7 @@ class GlobalNavigation:
             while current_node:
                 path.append(current_node)
                 current_node = previous_nodes[current_node]
-            return path[::-1], current_distance  # Return reversed path and distance
+            return path[::-1], current_distance, graph  # Return reversed path and distance
 
         # Check all neighbors
         for neighbor in graph[current_node]:
@@ -73,24 +73,56 @@ class GlobalNavigation:
 
     return None, float("inf"), graph  # Return None if no path is found
 
+ def plot_path(self, path, obstacles):
+     # Visualize the result
+     fig, ax = plt.subplots()
+
+     # Plot obstacles
+     for obstacle in obstacles:
+         poly = Polygon(obstacle)
+         x, y = poly.exterior.xy
+         ax.fill(x, y, color='gray', alpha=0.5)
+
+     # # Plot the start and goal points
+     # ax.plot(start[0], start[1], 'go', label="Start")
+     # ax.plot(goal[0], goal[1], 'ro', label="Goal")
+
+     # Plot the path if one is found
+     if path:
+         path_x = [point[0] for point in path]
+         path_y = [point[1] for point in path]
+         ax.plot(path_x, path_y, 'b-', label="Path")
+
+     ax.set_xlabel('X')
+     ax.set_ylabel('Y')
+     ax.set_title('Dijkstra Path Planning')
+     ax.legend()
+
+     plt.show()
+
+
 
 # Test function for the GlobalNavigation class
 if __name__ == "__main__":
     # Define some obstacles
-    obstacles = [
-        [(2, 2), (4, 2), (4, 4), (2, 4)],  # Square obstacle
-        [(6, 6), (8, 6), (8, 8), (6, 8)]  # Another square obstacle
-    ]
-
-    # Start and goal points
-    start = (0, 0)
-    goal = (10, 10)
+    # obstacles = [
+    #     [(2, 2), (4, 2), (4, 4), (2, 4)],  # Square obstacle
+    #     [(6, 6), (8, 6), (8, 8), (6, 8)]  # Another square obstacle
+    # ]
+    # obstacles = []
+    #
+    # # Start and goal points
+    # start = (0, 0)
+    # goal = (10, 10)
+    start = (73.973694, 75.61618)
+    goal = (406.53833, 69.10376)
+    obstacles = [[(464, 321), (366, 321), (404, 238)]]
 
     # Create an instance of the GlobalNavigation class
     navigation = GlobalNavigation()
 
     # Run Dijkstra's algorithm to find the shortest path
-    path, cost = navigation.dijkstra(start, goal, obstacles)
+    path, cost, graph = navigation.dijkstra(start, goal, obstacles)
 
     # Print results
     if path:
@@ -98,29 +130,4 @@ if __name__ == "__main__":
         print("Total cost:", cost)
     else:
         print("No path found")
-
-    # Visualize the result
-    fig, ax = plt.subplots()
-
-    # Plot obstacles
-    for obstacle in obstacles:
-        poly = Polygon(obstacle)
-        x, y = poly.exterior.xy
-        ax.fill(x, y, color='gray', alpha=0.5)
-
-    # Plot the start and goal points
-    ax.plot(start[0], start[1], 'go', label="Start")
-    ax.plot(goal[0], goal[1], 'ro', label="Goal")
-
-    # Plot the path if one is found
-    if path:
-        path_x = [point[0] for point in path]
-        path_y = [point[1] for point in path]
-        ax.plot(path_x, path_y, 'b-', label="Path")
-
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_title('Dijkstra Path Planning')
-    ax.legend()
-
-    plt.show()
+    navigation.plot_path(path, obstacles)
