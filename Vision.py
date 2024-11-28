@@ -498,8 +498,9 @@ class CameraFeed(threading.Thread):
                 #! alternative : if not detected, will return last known pose and goal instead
                 #! Julien thinks it's not a good idea
                 # robot_pose = self.vision_module.last_thymio_pose
-                # goal_position = self.vision_module.last_goal_pos
+                # goal_position = self.vision_module.last_goal_posq
 
+                obstacle_corners, filtered_mask, img_with_polygons = self.vision_module.detect_obstacle_corners(top_view)
 
                 Thymio_marker, goal_marker = self.vision_module.get_2_markers(top_view)
                 if Thymio_marker is not None: 
@@ -519,8 +520,6 @@ class CameraFeed(threading.Thread):
                         top_view = cv2.arrowedLine(top_view, np.array(robot_pose[:2],dtype='int32'), np.array(goal_position, dtype='int32'), (255, 0, 0), 8)
                 else:
                     print("Goal not detected")
-
-                obstacle_corners, filtered_mask, img_with_polygons = self.vision_module.detect_obstacle_corners(top_view)
 
                 #update attributes
                 self.obstacle_corners = obstacle_corners
@@ -563,7 +562,7 @@ class Vision():
         # self.stop_event = threading.Event()
 
     def begin(self, show_which=[1,1,1,1]):
-        if not self.analysis.initialize_camera(cam_port=4):
+        if not self.analysis.initialize_camera(cam_port=5):
             print("Erreur : Impossible d'initialiser la caméra.")
             return
         self.camera_feed.show_which = show_which
