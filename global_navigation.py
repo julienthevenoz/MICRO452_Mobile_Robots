@@ -43,7 +43,13 @@ class GlobalNavigation:
 
 
 # Implement Dijkstra's Algorithm
- def dijkstra(self, start, goal, obstacles):
+ def dijkstra(self, thymio, goal, obstacles):
+
+    thymio_x, thymio_y, theta = thymio
+    start = (thymio_x, thymio_y)
+    goal = tuple(goal)
+    obstacles = [tuple(obstacle) for obstacle in obstacles]
+
     graph = self.visibilityGraph(start, goal, obstacles)
     queue = [(0, start)]  # (cost, current_node)
     distances = {node: float("inf") for node in graph}
@@ -74,6 +80,7 @@ class GlobalNavigation:
     return None, float("inf"), graph  # Return None if no path is found
 
  def plot_path(self, path, obstacles):
+
      # Visualize the result
      fig, ax = plt.subplots()
 
@@ -114,15 +121,15 @@ if __name__ == "__main__":
     # # Start and goal points
     # start = (0, 0)
     # goal = (10, 10)
-    start = (73.973694, 75.61618)
-    goal = (406.53833, 69.10376)
-    obstacles = [[(464, 321), (366, 321), (404, 238)]]
+    thymio = [73.973694, 75.61618, 1.055]
+    goal = [406.53833, 69.10376]
+    obstacles = [[[464, 321], [366, 321], [404, 238]]]
 
     # Create an instance of the GlobalNavigation class
     navigation = GlobalNavigation()
 
     # Run Dijkstra's algorithm to find the shortest path
-    path, cost, graph = navigation.dijkstra(start, goal, obstacles)
+    path, cost, graph = navigation.dijkstra(thymio, goal, obstacles)
 
     # Print results
     if path:
