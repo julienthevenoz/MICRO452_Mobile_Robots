@@ -50,14 +50,14 @@ def show_img(img, title):
 
 class Analysis:
     """Module de gestion de la caméra et analyse d'image"""
-    def __init__(self, image=None, map_size=(1000,1000)):
+    def __init__(self, image=None):
         self.cam = None
         self.frame = image  #this should always contain the original, unaltered image
         self.frame_viz = image  #this is where the original frame WITH annotations should be
         self.top_view = None   #this is where the top-view visualization should be
         #dim 0 is which corner (0,1,2,3 = tl,tr,br,bl), dim1 is x or y
         self.map_corners = np.ones((4,2),dtype='int32')*(-1)
-        self.map_size = map_size  #arbitrary chosen metric of our map
+        self.map_size = (600,300)  #arbitrary chosen metric of our map
         self.last_thymio_pose = None
         self.last_goal_pos = None
 
@@ -380,8 +380,7 @@ class Analysis:
         # (i.e. top-down view) of the image, again specifying points
         # in the top-left, top-right, bottom-right, and bottom-left
         # order
-        maxWidth = 600
-        maxHeight = 300
+        maxWidth, maxHeight = self.map_size
         dst = np.array([
             [0, 0],
             [maxWidth - 1, 0],
