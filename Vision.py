@@ -2,7 +2,6 @@ import cv2
 import threading
 import time
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.signal import medfilt
 
 MIN_AREA = 10
@@ -86,52 +85,6 @@ class Analysis:
         self.frame = frame
         return frame
     
-    def distance(self, p1, p2):
-        """Calcul de la distance euclidienne entre deux points"""
-        return np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
-
-    def merge_polygons(self, obstacle_corners, threshold=10):
-        """
-        Fusionne des polygones dont les coins sont proches.
-        obstacle_corners : liste des coins des polygones.
-        threshold : distance maximale pour considérer deux points comme proches.
-        """
-        merged = []
-    
-        for polygon in obstacle_corners:
-            added = False
-            for merged_polygon in merged:
-                # Vérifiez si le polygone actuel est proche de l'un des polygones fusionnés
-                for point in polygon:
-                    if any(self.distance(point, merged_point) < threshold 
-                           for merged_point in merged_polygon):
-                        # Si oui, fusionnez les coins
-                        merged_polygon.extend(polygon)
-                        added = True
-                        break
-                if added:
-                    break
-                
-            if not added:
-                # Si le polygone n'est pas proche d'un polygone fusionné existant, ajoutez-le tel quel
-                merged.append(list(polygon))
-    
-        # Nettoyez les doublons dans les points fusionnés
-        merged_cleaned = []
-        for merged_polygon in merged:
-            cleaned = []
-            for point in merged_polygon:
-                if not any(self.distance(point, existing_point) < threshold 
-                           for existing_point in cleaned):
-                    cleaned.append(point)
-            # Appliquer l'enveloppe convexe pour garantir une forme convexe
-            if len(cleaned) > 2:  # S'il y a suffisamment de points pour former un polygone
-                cleaned = cv2.convexHull(np.array(cleaned, dtype=np.int32)).reshape(-1, 2).tolist()
-        
-            merged_cleaned.append(cleaned)
-    
-        return merged_cleaned
-
     def detect_obstacle_corners(self, img):
         """
         Detects obstacle edges in the image, approximates them as polygons, 
@@ -586,7 +539,7 @@ class CameraFeed(threading.Thread):
                     videofeeds_list, titles_list = v_l, t_l
                             
                 else:
-                    print(f"[Vision.camerafeed.run()] List of videofeeds must be {len(titles_list)}, not {len(show_which)}."\
+                    print(f"[Vision.camerafeed.run()] List of videofeeds must be {len(titles_list)}, not {len(self.show_which)}."\
                           "Defaulting to show all")
 
 
