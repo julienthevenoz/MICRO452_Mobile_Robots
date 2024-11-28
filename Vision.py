@@ -628,15 +628,12 @@ class Vision():
         self.camera_feed = CameraFeed(self.analysis)
         # self.stop_event = threading.Event()
 
-
     def begin(self, show_which=[1,1,1,1]):
         if not self.analysis.initialize_camera(cam_port=0):
             print("Erreur : Impossible d'initialiser la caméra.")
             return
         self.camera_feed.show_which = show_which
         self.camera_feed.start()
-
-
 
     def stop(self):
         self.camera_feed.stop()
