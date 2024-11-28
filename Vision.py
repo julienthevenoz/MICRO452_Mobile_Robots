@@ -317,7 +317,7 @@ class Analysis:
         #! To prevent a divison by 0, if for some unholy reason the diag distance is 0, we don't try to calculate the center 
         #! and always return the top right corner. This is not ideal but prevents a crash
             print("(find_marker_center_and_orientation) Division by 0 : returning tr instead of center")
-            return tr
+            return *tl, theta
         
         #we're gonna calculate the interception of the diagonals to find the center
         tl,tr,br,bl = marker
@@ -380,6 +380,8 @@ class Analysis:
         # (i.e. top-down view) of the image, again specifying points
         # in the top-left, top-right, bottom-right, and bottom-left
         # order
+        maxWidth = 600
+        maxHeight = 300
         dst = np.array([
             [0, 0],
             [maxWidth - 1, 0],
@@ -388,6 +390,7 @@ class Analysis:
         # compute the perspective transform matrix and then apply it
         M = cv2.getPerspectiveTransform(pts.astype('float32'), dst)
         warped = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
+        # warped = cv2.putText(warped, f"{maxWidth} x {maxHeight}", (100,100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 3)
         self.highlight_corners(warped, dst)
         # return the warped image
         return warped, M
