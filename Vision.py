@@ -487,7 +487,7 @@ class CameraFeed(threading.Thread):
                 annotated_img = self.vision_module.frame_viz
                 top_view = self.vision_module.top_view
 
-                #output variables : 
+                #output variables :>
                 # - [x,y,theta] of thymio - [x,y] of goal   -list of obstacle corners (list of list ?)
                 #if they have not been detected, will return empty list []
                 robot_pose = []
