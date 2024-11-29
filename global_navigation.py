@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import heapq
 import geopandas as gpd
 from geopandas import GeoSeries
+import cv2
+import time
 
 class GlobalNavigation:
 
@@ -79,6 +81,31 @@ class GlobalNavigation:
 
     return None, float("inf"), graph  # Return None if no path is found
 
+# Plot the path using cv2
+ def plot_path_cv2(self, path, obstacles, img_size=(600, 300)):
+     img = np.ones((img_size[1], img_size[0], 3), dtype=np.uint8) * 255  # White background
+
+     for obstacle in obstacles:
+         pts = np.array(obstacle, dtype=np.int32)
+         cv2.fillPoly(img, [pts], color=(150, 150, 150))  # Gray color for obstacles
+
+     if path:
+         for i in range(len(path) - 1):
+             start = tuple(map(int, path[i]))
+             end = tuple(map(int, path[i + 1]))
+             cv2.line(img, start, end, color=(255, 0, 0), thickness=2)  # Blue line for path
+
+     if path:
+         start = tuple(map(int, path[0]))
+         goal = tuple(map(int, path[-1]))
+         cv2.circle(img, start, radius=5, color=(0, 255, 0), thickness=-1)  # Green circle for start
+         cv2.circle(img, goal, radius=5, color=(0, 0, 255), thickness=-1)  # Red circle for goal
+
+     cv2.imshow("Path Planning", img)
+     cv2.waitKey(0)
+     cv2.destroyAllWindows()
+
+# Plot the path using matplotlib
  def plot_path(self, path, obstacles):
 
      # Visualize the result
@@ -107,8 +134,6 @@ class GlobalNavigation:
 
      plt.show()
 
-
-
 # Test function for the GlobalNavigation class
 if __name__ == "__main__":
     # Define some obstacles
@@ -121,20 +146,26 @@ if __name__ == "__main__":
     # # Start and goal points
     # start = (0, 0)
     # goal = (10, 10)
-    thymio = [73.973694, 75.61618, 1.055]
+    thymio = [201, 143, 1.055]
     goal = [406.53833, 69.10376]
-    obstacles = [[[464, 321], [366, 321], [404, 238]]]
+    obstacles = [[[464, 321], [366, 321], [404, 238]],
+                 [[200, 150], [250, 40], [270, 180], [230, 200], [200, 200]],
+                 [[500, 50], [550, 50], [570, 90], [520, 100], [500, 80]],
+                 [[275, 23], [325, 200], [340, 240], [290, 250], [275, 230]]]
 
     # Create an instance of the GlobalNavigation class
     navigation = GlobalNavigation()
-
+    start_time = time.time()
     # Run Dijkstra's algorithm to find the shortest path
     path, cost, graph = navigation.dijkstra(thymio, goal, obstacles)
-
+    end_time = time.time()
     # Print results
     if path:
         print("Path found:", path)
         print("Total cost:", cost)
     else:
         print("No path found")
-    navigation.plot_path(path, obstacles)
+
+    navigation.plot_path_cv2(path, obstacles)
+    execution_time = end_time - start_time
+    print("Execution time:", execution_time)
