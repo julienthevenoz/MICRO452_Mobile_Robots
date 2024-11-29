@@ -2,6 +2,7 @@ import cv2
 import threading
 import time
 import numpy as np
+from scipy.signal import medfilt
 
 MIN_AREA = 10
 DIST_THRESHOLD = 10
@@ -84,154 +85,87 @@ class Analysis:
         self.frame = frame
         return frame
     
-    def distance(self, p1, p2):
-        """Calcul de la distance euclidienne entre deux points"""
-        return np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
-
-    def merge_polygons(self, obstacle_corners, threshold=10):
-        """
-        Fusionne des polygones dont les coins sont proches.
-        obstacle_corners : liste des coins des polygones.
-        threshold : distance maximale pour considérer deux points comme proches.
-        """
-        merged = []
-    
-        for polygon in obstacle_corners:
-            added = False
-            for merged_polygon in merged:
-                # Vérifiez si le polygone actuel est proche de l'un des polygones fusionnés
-                for point in polygon:
-                    if any(self.distance(point, merged_point) < threshold 
-                           for merged_point in merged_polygon):
-                        # Si oui, fusionnez les coins
-                        merged_polygon.extend(polygon)
-                        added = True
-                        break
-                if added:
-                    break
-                
-            if not added:
-                # Si le polygone n'est pas proche d'un polygone fusionné existant, ajoutez-le tel quel
-                merged.append(list(polygon))
-    
-        # Nettoyez les doublons dans les points fusionnés
-        merged_cleaned = []
-        for merged_polygon in merged:
-            cleaned = []
-            for point in merged_polygon:
-                if not any(self.distance(point, existing_point) < threshold 
-                           for existing_point in cleaned):
-                    cleaned.append(point)
-            # Appliquer l'enveloppe convexe pour garantir une forme convexe
-            if len(cleaned) > 2:  # S'il y a suffisamment de points pour former un polygone
-                cleaned = cv2.convexHull(np.array(cleaned, dtype=np.int32)).reshape(-1, 2).tolist()
-        
-            merged_cleaned.append(cleaned)
-    
-        return merged_cleaned
-
     def detect_obstacle_corners(self, img):
         """
-        Détecte les bords des obstacles dans l'image, les approxime par des polygones,
-        et garde uniquement ceux dont la couleur moyenne est noire (obstacles).
+        Detects obstacle edges in the image, approximates them as polygons, 
+        and keeps only those with an average color that resembles black (obstacles).
+        Returns three outputs: the polygons, the binary obstacle mask, and the image with visualized polygons.
         """
-        # 1. Conversion de l'image en HSV pour une analyse des couleurs
-        hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        # 1. Convert the image to LAB color space for color analysis
+        lab_img = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
 
-        # 2. Conversion de l'image en niveaux de gris
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # 2. Calculate the histogram of the L component
+        hist = cv2.calcHist([lab_img[:, :, 0]], [0], None, [180], [0, 180])  # 180 bins for L in the range [0, 180]
+        signal = np.gradient(medfilt(hist.flatten(), 15))  # Median filtering to smooth the signal
 
-        # 3. Application d'un flou pour réduire le bruit
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        grad_threshold = -10
+        highest = 125
 
-        # 4. Détection des bords avec Canny
-        edges = cv2.Canny(blurred, threshold1=150, threshold2=200)
+        # 3. Search for the threshold in the signal
+        crossing_index = -1
+        for i in range(highest - 1, 1, -1):  # Start just below 'highest' and move backwards
+            if signal[i] < grad_threshold:
+                crossing_index = i
+                break
 
-        # 5. Trouver les contours dans l'image avec la méthode findContours
-        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # Find the threshold
+        if crossing_index != -1:
+            print(f"The highest index where the signal crosses {grad_threshold} is {crossing_index}.")
+        else:
+            print(f"No crossing found before index {highest}.")
 
-        # 6. Liste pour stocker les coins des obstacles
+        treshold = crossing_index
+
+        # 4. Create a binary mask based on the threshold
+        mask = lab_img[:, :, 0] < treshold
+        obstacles = np.uint8(mask * 255)
+
+        # 5. Process connected components
+        COUNT = 2000  # Minimum size threshold for components
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(obstacles, connectivity=8)
+        filtered_mask = np.zeros_like(obstacles)
+
+        for i in range(1, num_labels):  # Ignore background (label 0)
+            if stats[i, cv2.CC_STAT_AREA] >= COUNT:
+                filtered_mask[labels == i] = 255
+
+        # 6. Morphological operations to smooth the mask
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))  # Structuring element for dilation
+        filtered_mask = cv2.dilate(filtered_mask, kernel)
+        filtered_mask = cv2.erode(filtered_mask, kernel)
+
+        # 7. Find contours of the obstacles
+        contours, _ = cv2.findContours(filtered_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # 8. List to store the corners of the obstacles
         obstacle_corners = []
 
-        # 7. Image pour visualiser les polygones détectés
-        img_with_polygons = img.copy()
-
-        # 8. Plage de teinte pour le noir (en HSV)
-        lower_black_hsv = np.array([0, 80, 20])  # Ajustez selon vos besoins
-        upper_black_hsv = np.array([179, 150, 120])
-
-        # 9. Parcourir chaque contour trouvé
-        approx_img = img.copy()  # Image pour visualiser l'approximation des polygones
+        # 9. Approximate the contours as polygons
         for contour in contours:
-            # Approximation du contour par un polygone
-            epsilon = 0.02 * cv2.arcLength(contour, True)  # Précision de l'approximation
+            epsilon = 0.02 * cv2.arcLength(contour, True)  # Approximation precision
             approx = cv2.approxPolyDP(contour, epsilon, True)
 
-            # Générer une couleur aléatoire pour chaque polygone
-            color = np.random.randint(0, 256, 3).tolist()  # Couleur aléatoire (BGR)
-
-            # Dessiner les coins du polygone
-            for (x, y) in approx.reshape(-1, 2):  # Dessiner les coins
-                cv2.circle(approx_img, (x, y), 5, (0, 0, 255), -1)  # Coins en rouge
-            cv2.drawContours(approx_img, [approx], -1, color, 2)  # Dessiner les polygones
+            # Add the corners of the polygons
             obstacle_corners.append(approx.reshape(-1, 2).tolist())
 
-        # Affichage intermédiaire de l'approximation des polygones
-        #show_many_img([approx_img], ["Polygones avant fusion"])
+        # 10. Visualize the polygons with colored edges and circles at corners
+        img_with_polygons = img.copy()
 
-        # 10. Fusionner les polygones proches
-        obstacle_corners = self.merge_polygons(obstacle_corners, DIST_THRESHOLD)
+        # Assign a unique color for each polygon
+        for i, polygon in enumerate(obstacle_corners):
+            # Random color for each polygon (BGR format)
+            color = np.random.randint(0, 256, 3).tolist()
 
-        # Affichage après fusion des polygones
-        merged_img = img.copy()
-        for polygon in obstacle_corners:
-            polygon_array = np.array(polygon, dtype=np.int32)
-            color = np.random.randint(0, 256, 3).tolist()  # Couleur aléatoire pour chaque polygone
-            cv2.drawContours(merged_img, [polygon_array], -1, color, 2)  # Dessiner les polygones fusionnés
+            # Draw the corners as red circles
             for (x, y) in polygon:
-                cv2.circle(merged_img, (x, y), 5, (0, 0, 255), -1)  # Coins en rouge
+                cv2.circle(img_with_polygons, (x, y), 5, (0, 0, 255), -1)  # Red circles at corners
 
-        #show_many_img([merged_img], ["Polygones après fusion"])
-
-        # 11. Calculer la moyenne des couleurs à l'intérieur des polygones et filtrer par couleur
-        final_polygons = []
-        MIN_AREA = 1000  # Seuil d'aire minimal pour un polygone
-
-        for polygon in obstacle_corners:
-            # Créer un masque pour extraire l'intérieur du polygone
-            mask = np.zeros_like(hsv_img[:, :, 0])
-            cv2.drawContours(mask, [np.array(polygon, dtype=np.int32)], -1, (255), thickness=cv2.FILLED)
-
-            # Calcul de l'aire du polygone
+            # Draw the polygon edges
             polygon_array = np.array(polygon, dtype=np.int32)
-            area = cv2.contourArea(polygon_array)
+            cv2.drawContours(img_with_polygons, [polygon_array], -1, color, 2)  # Polygon edges with random color
 
-            # Si l'aire est inférieure au seuil, on ignore ce polygone
-            if area < MIN_AREA:
-                continue  # Passer au prochain polygone si l'aire est trop petite
-
-            # Calcul de la moyenne des couleurs à l'intérieur du polygone en HSV
-            mean_color_hsv = cv2.mean(hsv_img, mask=mask)
-
-            # Filtrer en fonction de la couleur noire
-            if ((lower_black_hsv[0] <= mean_color_hsv[0] <= upper_black_hsv[0]) and 
-                (lower_black_hsv[1] <= mean_color_hsv[1] <= upper_black_hsv[1]) and 
-                (lower_black_hsv[2] <= mean_color_hsv[2] <= upper_black_hsv[2])):
-                final_polygons.append(polygon)
-
-        # 12. Affichage final avec les polygones filtrés
-        final_img = img.copy()
-        for polygon in final_polygons:
-            polygon_array = np.array(polygon, dtype=np.int32)
-            color = np.random.randint(0, 256, 3).tolist()  # Couleur aléatoire pour chaque polygone
-            cv2.drawContours(final_img, [polygon_array], -1, color, 2)
-            for (x, y) in polygon:
-                cv2.circle(final_img, (x, y), 5, (0, 0, 255), -1)
-
-        # Affichage final
-        #show_many_img([final_img], ["Polygones filtrés"])
-
-        return final_polygons, final_img
+        # 11. Return the results: obstacle corners, binary mask, and image with visualized polygons
+        return obstacle_corners, filtered_mask, img_with_polygons
 
     def analyze_frame(self, frame):
         """
@@ -564,8 +498,9 @@ class CameraFeed(threading.Thread):
                 #! alternative : if not detected, will return last known pose and goal instead
                 #! Julien thinks it's not a good idea
                 # robot_pose = self.vision_module.last_thymio_pose
-                # goal_position = self.vision_module.last_goal_pos
+                # goal_position = self.vision_module.last_goal_posq
 
+                obstacle_corners, filtered_mask, img_with_polygons = self.vision_module.detect_obstacle_corners(top_view)
 
                 Thymio_marker, goal_marker = self.vision_module.get_2_markers(top_view)
                 if Thymio_marker is not None: 
@@ -586,15 +521,13 @@ class CameraFeed(threading.Thread):
                 else:
                     print("Goal not detected")
 
-                obstacle_corners, img_with_polygons = self.vision_module.detect_obstacle_corners(top_view)
-
                 #update attributes
                 self.obstacle_corners = obstacle_corners
                 self.robot_pose = robot_pose
                 self.goal_position = goal_position
                 
-                videofeeds_list = [frame, img_with_polygons, annotated_img, top_view]
-                titles_list = ["Original", "Processed_with_polygones", "Highlighting corners", "thymio Oops, baby"]
+                videofeeds_list = [frame, filtered_mask, img_with_polygons, annotated_img, top_view]
+                titles_list = ["Original", "filtered_mask", "Processed_with_polygones", "Highlighting corners", "thymio Oops, baby"]
                 # Afficher les deux images en parallèle
                 if len(videofeeds_list) == len(self.show_which):
                     v_l, t_l = [], []
@@ -605,7 +538,7 @@ class CameraFeed(threading.Thread):
                     videofeeds_list, titles_list = v_l, t_l
                             
                 else:
-                    print(f"[Vision.camerafeed.run()] List of videofeeds must be {len(titles_list)}, not {len(show_which)}."\
+                    print(f"[Vision.camerafeed.run()] List of videofeeds must be {len(titles_list)}, not {len(self.show_which)}."\
                           "Defaulting to show all")
 
 
@@ -628,15 +561,12 @@ class Vision():
         self.camera_feed = CameraFeed(self.analysis)
         # self.stop_event = threading.Event()
 
-
     def begin(self, show_which=[1,1,1,1]):
-        if not self.analysis.initialize_camera(cam_port=0):
+        if not self.analysis.initialize_camera(cam_port=5):
             print("Erreur : Impossible d'initialiser la caméra.")
             return
         self.camera_feed.show_which = show_which
         self.camera_feed.start()
-
-
 
     def stop(self):
         self.camera_feed.stop()
