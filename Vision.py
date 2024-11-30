@@ -206,7 +206,7 @@ class Analysis:
         markerCorners, markerIds, _ = detector.detectMarkers(gray)
         if markerIds is not None:
             frame_markers = cv2.aruco.drawDetectedMarkers(img.copy(), markerCorners, markerIds)
-            print(f"Detected markers: {markerIds.flatten()}")
+            #print(f"Detected markers: {markerIds.flatten()}")
         else:
             print("no markers")
 
@@ -226,7 +226,7 @@ class Analysis:
         if ids is None:
             print("NO MARKERS DETECTED")
             return None, None
-        print(f"Detected {len(ids)} markers : {list(squeeze(ids))}")
+        #print(f"Detected {len(ids)} markers : {list(squeeze(ids))}")
         if markers.shape == (0,):
             return squeeze(markers), squeeze(ids)
         #verifiy that we have the 6 markers   
@@ -367,7 +367,7 @@ class Analysis:
             # show_img(highlighted_corners,"Corners : o = detected    [] = remembered")
             self.frame_viz = highlighted_corners
 
-        print(f"{len(corners)} detected corners, {in_memory} corners stored")
+        #print(f"{len(corners)} detected corners, {in_memory} corners stored")
 
     def draw_path_on_image(self, path):
         """
@@ -377,7 +377,6 @@ class Analysis:
         :param path: Liste des points [x, y] représentant le chemin
         :return: Image avec le chemin dessiné
         """
-        print ("In the path pprinting function : ")
         img_with_path = self.top_view.copy()
         for i in range(len(path) - 1):
             start = tuple(map(int, path[i]))
@@ -507,10 +506,8 @@ class CameraFeed(threading.Thread):
                 dijkstra_path_view = top_view
 
                 if self.vision_module.path :
-                    print ("path found")
                     print ("path1 : ", self.vision_module.path)
                     dijkstra_path_view = self.vision_module.draw_path_on_image(self.vision_module.path)
-                    print("Finito with the function")
 
                 #output variables :>
                 # - [x,y,theta] of thymio - [x,y] of goal   -list of obstacle corners (list of list ?)
