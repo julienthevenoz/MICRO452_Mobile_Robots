@@ -369,20 +369,26 @@ class Analysis:
 
         print(f"{len(corners)} detected corners, {in_memory} corners stored")
 
-    def draw_path_on_image(self, path):
+    def draw_path_on_image(self, path, past_positions=[]):
         """
         Dessine le chemin calculé par Dijkstra sur l'image donnée.
+        Draw the dijsktra path in green on the image, and all past positions (path already travelled) as red dots.
 
         :param image: Image sur laquelle dessiner
         :param path: Liste des points [x, y] représentant le chemin
         :return: Image avec le chemin dessiné
         """
-        print ("In the path pprinting function : ")
         img_with_path = self.top_view.copy()
         for i in range(len(path) - 1):
             start = tuple(map(int, path[i]))
             end = tuple(map(int, path[i + 1]))
             cv2.line(img_with_path, start, end, (0, 255, 0), 2)  # Vert pour le chemin
+        
+        #draw red points for points already travelled
+        if past_positions:
+            for position in past_positions:
+                if position != [-1,1]:
+                    cv2.circle(img_with_path, position, 0, (0,0,255), -1)
         return img_with_path
 
     def detect_thymio_pose(self,thymio_marker):
@@ -474,14 +480,15 @@ class Analysis:
 
 class CameraFeed(threading.Thread):
     """Thread pour capturer et afficher un flux vidéo constant"""
-    def __init__(self, vision_module):
+    def __init__(self, analysis_module):
         super().__init__()
-        self.vision_module = vision_module
+        self.vision_module = analysis_module
         self.stop_event = threading.Event()
         self.robot_pose = []
         self.goal_position = []
         self.obstacle_corners = []
         self.show_which = [1,1,1,1,1,1]
+        self.past_positions = []
 
     # def get_thymio_goal_and_obstacles(self):
     #     '''Returns [x,y,theta] of thymio, [x,y] of goal and list of obstacle 
@@ -509,7 +516,7 @@ class CameraFeed(threading.Thread):
                 if self.vision_module.path :
                     print ("path found")
                     print ("path1 : ", self.vision_module.path)
-                    dijkstra_path_view = self.vision_module.draw_path_on_image(self.vision_module.path)
+                    dijkstra_path_view = self.vision_module.draw_path_on_image(self.vision_module.path, self.past_positions)
                     print("Finito with the function")
 
                 #output variables :>
@@ -550,6 +557,12 @@ class CameraFeed(threading.Thread):
                 self.obstacle_corners = obstacle_corners
                 self.robot_pose = robot_pose
                 self.goal_position = goal_position
+
+                #update past_positions:
+                if robot_pose:
+                    self.past_positions.append(robot_pose[:2])
+                else:
+                    self.past_positions.append([-1,-1])
                 
                 videofeeds_list = [frame, filtered_mask, img_with_polygons, annotated_img, top_view, dijkstra_path_view]
                 titles_list = ["Original", "filtered_mask", "Processed_with_polygones", "Highlighting corners", "thymio Oops, baby", "dijkstra_path_view"]
