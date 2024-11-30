@@ -61,6 +61,7 @@ class Analysis:
         self.map_size = (600,300)  #arbitrary chosen metric of our map
         self.last_thymio_pose = None
         self.last_goal_pos = None
+        self.path = None
 
     def initialize_camera(self, cam_port=4):
         """Initialise la caméra"""
@@ -368,6 +369,22 @@ class Analysis:
 
         print(f"{len(corners)} detected corners, {in_memory} corners stored")
 
+    def draw_path_on_image(self, path):
+        """
+        Dessine le chemin calculé par Dijkstra sur l'image donnée.
+
+        :param image: Image sur laquelle dessiner
+        :param path: Liste des points [x, y] représentant le chemin
+        :return: Image avec le chemin dessiné
+        """
+        print ("In the path pprinting function : ")
+        img_with_path = self.top_view.copy()
+        for i in range(len(path) - 1):
+            start = tuple(map(int, path[i]))
+            end = tuple(map(int, path[i + 1]))
+            cv2.line(img_with_path, start, end, (0, 255, 0), 2)  # Vert pour le chemin
+        return img_with_path
+
     def detect_thymio_pose(self,thymio_marker):
         '''Returns [x,y,theta] of the thymio marker center. X and Y would be int, theta float'''
         if thymio_marker is not None:
@@ -464,7 +481,7 @@ class CameraFeed(threading.Thread):
         self.robot_pose = []
         self.goal_position = []
         self.obstacle_corners = []
-        self.show_which = [1,1,1,1]
+        self.show_which = [1,1,1,1,1,1]
 
     # def get_thymio_goal_and_obstacles(self):
     #     '''Returns [x,y,theta] of thymio, [x,y] of goal and list of obstacle 
@@ -484,8 +501,16 @@ class CameraFeed(threading.Thread):
                 self.vision_module.julien_main(frame)
                 if self.vision_module.frame_viz is None:
                     self.vision_module.frame_viz = frame
+
                 annotated_img = self.vision_module.frame_viz
                 top_view = self.vision_module.top_view
+                dijkstra_path_view = top_view
+
+                if self.vision_module.path :
+                    print ("path found")
+                    print ("path1 : ", self.vision_module.path)
+                    dijkstra_path_view = self.vision_module.draw_path_on_image(self.vision_module.path)
+                    print("Finito with the function")
 
                 #output variables :>
                 # - [x,y,theta] of thymio - [x,y] of goal   -list of obstacle corners (list of list ?)
@@ -526,8 +551,9 @@ class CameraFeed(threading.Thread):
                 self.robot_pose = robot_pose
                 self.goal_position = goal_position
                 
-                videofeeds_list = [frame, filtered_mask, img_with_polygons, annotated_img, top_view]
-                titles_list = ["Original", "filtered_mask", "Processed_with_polygones", "Highlighting corners", "thymio Oops, baby"]
+                videofeeds_list = [frame, filtered_mask, img_with_polygons, annotated_img, top_view, dijkstra_path_view]
+                titles_list = ["Original", "filtered_mask", "Processed_with_polygones", "Highlighting corners", "thymio Oops, baby", "dijkstra_path_view"]
+                
                 # Afficher les deux images en parallèle
                 if len(videofeeds_list) == len(self.show_which):
                     v_l, t_l = [], []
@@ -540,7 +566,6 @@ class CameraFeed(threading.Thread):
                 else:
                     print(f"[Vision.camerafeed.run()] List of videofeeds must be {len(titles_list)}, not {len(self.show_which)}."\
                           "Defaulting to show all")
-
 
                 show_many_img(videofeeds_list, titles_list)
 
@@ -561,7 +586,7 @@ class Vision():
         self.camera_feed = CameraFeed(self.analysis)
         # self.stop_event = threading.Event()
 
-    def begin(self, show_which=[1,1,1,1]):
+    def begin(self, show_which=[1,1,1,1,1,1]):
         if not self.analysis.initialize_camera(cam_port=4):
             print("Erreur : Impossible d'initialiser la caméra.")
             return
@@ -606,6 +631,7 @@ def main():
     #     print("Programme terminé.")
     visio = Vision()
     visio.begin()
+    #show_many_img([visio.analysis.frame], ["titre"])
 
 
 if __name__ == "__main__":
