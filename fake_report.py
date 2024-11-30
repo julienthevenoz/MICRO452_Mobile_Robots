@@ -1,3 +1,11 @@
+from tdmclient import ClientAsync
+
+from global_navigation import GlobalNavigation
+
+client = ClientAsync()
+node = await client.wait_for_node()
+await node.lock()
+
 from Vision import Vision, show_many_img
 import time
 from motion_control import MotionControl
@@ -52,7 +60,7 @@ try:
         #        break
         #    else:
         #        goal_point = path[0]
-        # thymio, goal, obstacles = visio.get_thymio_goal_and_obstacles()q
+        # thymio, goal, obstacles = visio.get_thymio_goal_and_obstacles()
         time.sleep(0.2)
 except KeyboardInterrupt:
     print("Stop the program")
