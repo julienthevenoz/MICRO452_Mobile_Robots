@@ -1,2 +1,3 @@
 perso_notes
-__pycache__/*
+__pycache__/
+*.pyc
