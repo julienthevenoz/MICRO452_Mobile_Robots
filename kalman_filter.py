@@ -12,8 +12,8 @@ class KalmanFilter:
                            [0, 0.1, 0],
                            [0, 0, 0.1]])
         "Variance of the control input"
-        self.R = np.array([[0.1, 0],
-                           [0, 0,1]])
+        self.R = np.array([[10, 0],
+                           [0, 10]])
 
         "Distance between two wheels(m)"
         self.L = 0.095
