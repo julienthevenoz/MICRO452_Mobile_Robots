@@ -7,8 +7,9 @@ class MotionControl:
   '''
   def __init__(self, thymio):
     # important parameter to adjust
-    self.Ka = 30
-    self.Kb = 40
+    self.Ka = 25
+    self.Kb = -0.0001
+    self.Kp = 50
 
     # speed limit
     self.max_velocity = 1000
@@ -76,6 +77,7 @@ class MotionControl:
 
   def path_tracking(self, robot_state, goal_point):
     print('hi')
+    state = False
     if not robot_state or not goal_point:
       return False
     x, y, theta = robot_state
@@ -84,20 +86,28 @@ class MotionControl:
     delta_y = y_goal - y
     distance_to_goal = np.sqrt(delta_x ** 2 + delta_y ** 2)
     self.distance_to_goal = distance_to_goal
-    if distance_to_goal < self.goal_range:
-      print('reached goal')
-      return True
+    # if distance_to_goal < self.goal_range:
+
+    #   print('reached goal')
+    #   return True
     angle_to_goal = np.arctan2(delta_y, delta_x)
     angle_error = angle_to_goal - theta
-    v = self.Ka * distance_to_goal * np.cos(angle_error)
-    omega = self.Kb * angle_error + self.Ka * (np.cos(angle_error) * np.sin(angle_error))
-    v = max(-self.max_velocity, min(v, self.max_velocity))
-    omega = max(-self.max_omega, min(omega, self.max_omega))
+    beta =  - theta - angle_error
+    v = self.Kp * distance_to_goal 
+    omega = self.Kb * beta + self.Ka * angle_error
+    if(distance_to_goal > 300):
+      v = 300 * self.wheel_radis
+    if(distance_to_goal < 100):
+      v = 100 * self.wheel_radis
+    if(distance_to_goal < 30):
+      v = 0
+      state = True
+    # v = max(-self.max_velocity, min(v, self.max_velocity))
+    # omega = max(-self.max_omega, min(omega, self.max_omega))
     v_L =  (v - (self.L * omega / 2)) / self.wheel_radis
     v_R = (v + (self.L * omega / 2)) / self.wheel_radis
     self.set_motor_speed(v_L, v_R)
-    print(angle_to_goal,omega)
-    return False
+    return state
 
   def get_motor_speed(self):
     motor_speed = self.thymio.read_motors_speed()
