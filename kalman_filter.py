@@ -55,3 +55,6 @@ class KalmanFilter:
         kal_state = est_state + np.matmul(K, (measurenment - est_state))
         kal_variance = est_variance - np.matmul(K, est_variance)
         return kal_state, kal_variance
+    
+
+    
