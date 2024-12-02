@@ -53,7 +53,10 @@ try:
 
         path, _, _ = global_nav.dijkstra(thymio, goal, obstacles)
         visio.analysis.path = path
-        goal_point = path[1]
+        if path is not None:
+            goal_point = path[1]
+        else:
+            print("NO GOAL FOUND !!!")
         #motion_control.obstacle_avoidance()
         #if motion_control.path_tracking(thymio, goal_point):
         #    if not path:
