@@ -387,8 +387,8 @@ class Analysis:
         #draw red points for points already travelled
         if past_positions:
             for position in past_positions:
-                if position.any() != [-1,1]:
-                    cv2.circle(img_with_path, np.array(position,dtype="int32"), 2, (0,0,255), -1)
+                #if position.any() != [-1,-1]:
+                cv2.circle(img_with_path, np.array(position,dtype="int32"), 2, (0,0,255), -1)
         return img_with_path
 
     def detect_thymio_pose(self,thymio_marker):
