@@ -110,10 +110,10 @@ class Analysis:
                 break
 
         # # Find the threshold
-        # if crossing_index != -1:
-        #     print(f"The highest index where the signal crosses {grad_threshold} is {crossing_index}.")
-        # else:
-        #     print(f"No crossing found before index {highest}.")
+        # # if crossing_index != -1:
+        # #     print(f"The highest index where the signal crosses {grad_threshold} is {crossing_index}.")
+        # # else:
+        # #     print(f"No crossing found before index {highest}.")
 
         treshold = crossing_index
 
@@ -388,8 +388,7 @@ class Analysis:
         if past_positions:
             for position in past_positions:
                 if position != [-1,1]:
-                    position = np.array(position,dtype="int32")
-                    cv2.circle(img_with_path, position, 0, (0,0,255), -1)
+                    cv2.circle(img_with_path, np.array(position,dtype="int32"), 2, (0,0,255), -1)
         return img_with_path
 
     def detect_thymio_pose(self,thymio_marker):
@@ -515,7 +514,6 @@ class CameraFeed(threading.Thread):
                 dijkstra_path_view = top_view
 
                 if self.vision_module.path :
-                    #print ("path1 : ", self.vision_module.path)
                     dijkstra_path_view = self.vision_module.draw_path_on_image(self.vision_module.path, self.past_positions)
 
                 #output variables :>
@@ -541,14 +539,14 @@ class CameraFeed(threading.Thread):
                     # Calculate the end point of the arrow using the angle theta
                     end_x = int(robot_pose[0] + arrow_length * np.cos(robot_pose[2]))
                     end_y = int(robot_pose[1] + arrow_length * np.sin(robot_pose[2]))
-                    top_view = cv2.arrowedLine(top_view, np.array(robot_pose[:2],dtype='int32'), (end_x, end_y), (0, 0, 255), 5)
+                    top_view = cv2.arrowedLine(top_view.copy(), np.array(robot_pose[:2],dtype='int32'), (end_x, end_y), (0, 0, 255), 5)
                 else:
                     print("Thymio not detected")
            
                 if goal_marker is not None:
                     goal_position = self.vision_module.detect_goal_position(goal_marker)
                     if Thymio_marker is not None:
-                        top_view = cv2.arrowedLine(top_view, np.array(robot_pose[:2],dtype='int32'), np.array(goal_position, dtype='int32'), (255, 0, 0), 8)
+                        top_view = cv2.arrowedLine(top_view.copy(), np.array(robot_pose[:2],dtype='int32'), np.array(goal_position, dtype='int32'), (255, 0, 0), 8)
                 else:
                     print("Goal not detected")
 
@@ -599,7 +597,7 @@ class Vision():
         # self.stop_event = threading.Event()
 
     def begin(self, show_which=[1,1,1,1,1,1]):
-        if not self.analysis.initialize_camera(cam_port=4):
+        if not self.analysis.initialize_camera(cam_port=0):
             print("Erreur : Impossible d'initialiser la caméra.")
             return
         self.camera_feed.show_which = show_which
