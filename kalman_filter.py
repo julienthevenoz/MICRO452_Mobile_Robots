@@ -18,6 +18,7 @@ class KalmanFilter:
         "Distance between two wheels(m)"
         self.L = 0.095
 
+
     def get_A_linear(self, theta, v, omega):
         A_linear = np.array([
             [1, 0, -v *np.sin(theta + omega)],
@@ -40,15 +41,15 @@ class KalmanFilter:
         ])
         return B_linear
 
-    def kalman_filter(self, state, pre_state, pre_variance, theta, vl, vr, measurenment):
+    def estimate(self, pre_state, pre_variance, vl, vr, measurenment):
         v = (vl + vr) / 2
         omega = (vl + vr) / (2 * self.L)
         "state update"
-        est_state = np.array([pre_state[1] + v * np.sin(theta + omega),
-                              pre_state[2] + v * np.sin(theta + omega),
-                              (pre_state[3] + omega) % (2*np.pi)])
-        A = self.get_A_linear(theta, v, omega)
-        B = self.get_B_linear(theta, v, omega)
+        est_state = np.array([pre_state[0] + v * np.sin(pre_state[2] + omega),
+                              pre_state[1] + v * np.sin(pre_state[2] + omega),
+                              (pre_state[2] + omega) % (2*np.pi)])
+        A = self.get_A_linear(pre_state[2], v, omega)
+        B = self.get_B_linear(pre_state[2], v, omega)
         est_variance = np.matmul(A, np.matmul(pre_variance, A.T)) + np.matmul(B, np.matmul(self.R, B.T))
         K = np.matmul(est_variance, np.linalg.inv(est_variance + self.Q))
         kal_state = est_state + np.matmul(K, (measurenment - est_state))
