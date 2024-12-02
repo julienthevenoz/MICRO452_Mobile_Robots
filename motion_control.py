@@ -83,21 +83,20 @@ class MotionControl:
     delta_x = x_goal - x
     delta_y = y_goal - y
     distance_to_goal = np.sqrt(delta_x ** 2 + delta_y ** 2)
-    
-    print ("distance du but = ", distance_to_goal)
-
     self.distance_to_goal = distance_to_goal
     if distance_to_goal < self.goal_range:
       print('reached goal')
       return True
     angle_to_goal = np.arctan2(delta_y, delta_x)
     angle_error = angle_to_goal - theta
-    # v = self.Ka * distance_to_goal
-    v = 80
-    omega = self.Kb * angle_error
+    v = self.Ka * distance_to_goal * np.cos(angle_error)
+    omega = self.Kb * angle_error + self.Ka * (np.cos(angle_error) * np.sin(angle_error))
     v = max(-self.max_velocity, min(v, self.max_velocity))
     omega = max(-self.max_omega, min(omega, self.max_omega))
-    self.set_motor_speed(v+omega, v-omega)
+    v_L =  (v - (self.L * omega / 2)) / self.wheel_radis
+    v_R = (v + (self.L * omega / 2)) / self.wheel_radis
+    self.set_motor_speed(v_L, v_R)
+    print(angle_to_goal,omega)
     return False
 
   def get_motor_speed(self):
