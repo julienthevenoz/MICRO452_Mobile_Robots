@@ -555,11 +555,11 @@ class CameraFeed(threading.Thread):
                 self.robot_pose = robot_pose
                 self.goal_position = goal_position
 
-                #update past_positions:
-                if robot_pose:
-                    self.past_positions.append(robot_pose[:2])
-                else:
-                    self.past_positions.append([-1,-1])
+                # #update past_positions:
+                # if robot_pose:
+                #     self.past_positions.append(robot_pose[:2])
+                # else:
+                #     self.past_positions.append([-1,-1])
                 
                 videofeeds_list = [frame, filtered_mask, img_with_polygons, annotated_img, top_view, dijkstra_path_view]
                 titles_list = ["Original", "filtered_mask", "Processed_with_polygones", "Highlighting corners", "thymio Oops, baby", "dijkstra_path_view"]

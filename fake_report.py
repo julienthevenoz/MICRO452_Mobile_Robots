@@ -2,9 +2,9 @@ from tdmclient import ClientAsync
 
 from global_navigation import GlobalNavigation
 
-client = ClientAsync()
-node = await client.wait_for_node()
-await node.lock()
+# client = ClientAsync()
+# node = await client.wait_for_node()
+# await node.lock()
 
 from Vision import Vision, show_many_img
 import time
@@ -53,7 +53,10 @@ try:
 
         path, _, _ = global_nav.dijkstra(thymio, goal, obstacles)
         visio.analysis.path = path
-        goal_point = path[1]
+        if path is not None:
+            goal_point = path[1]
+        else:
+            print("GOAL IS NONE !!!!!!!")
         #motion_control.obstacle_avoidance()
         #if motion_control.path_tracking(thymio, goal_point):
         #    if not path:
