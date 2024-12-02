@@ -2,9 +2,9 @@ from tdmclient import ClientAsync
 
 from global_navigation import GlobalNavigation
 
-# client = ClientAsync()
-# node = await client.wait_for_node()
-# await node.lock()
+client = ClientAsync()
+node = await client.wait_for_node()
+await node.lock()
 
 from Vision import Vision, show_many_img
 import time
@@ -26,6 +26,10 @@ motion_control = MotionControl(Thymio)
 #goal_point = path[1]
 #print(goal_point)
 
+
+global_nav = GlobalNavigation()
+Thymio = Thymio(node, client)
+motion_control = MotionControl(Thymio)
 
 thymio, goal, obstacles = [],[],[]
 
@@ -53,18 +57,18 @@ try:
 
         path, _, _ = global_nav.dijkstra(thymio, goal, obstacles)
         visio.analysis.path = path
-        if path is not None:
-            goal_point = path[1]
-        else:
-            print("GOAL IS NONE !!!!!!!")
-        #motion_control.obstacle_avoidance()
-        #if motion_control.path_tracking(thymio, goal_point):
-        #    if not path:
-        #        break
-        #    else:
-        #        goal_point = path[0]
-        # thymio, goal, obstacles = visio.get_thymio_goal_and_obstacles()
-        time.sleep(0.2)
+        #path.pop(0)
+        goal_point = path[1]
+        print("liste des objectifs", path)
+        motion_control.obstacle_avoidance()
+        if motion_control.path_tracking(thymio, goal_point):
+            print("objectif suivant atteint")
+            path.pop(0)
+            if len(path) == 1:
+                motion_control.stop_motor()
+                break
+        #thymio, goal, obstacles = visio.get_thymio_goal_and_obstacles()
+        time.sleep(0.5)
 except KeyboardInterrupt:
     print("Stop the program")
 finally:

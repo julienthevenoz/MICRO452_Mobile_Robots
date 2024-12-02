@@ -387,7 +387,7 @@ class Analysis:
         #draw red points for points already travelled
         if past_positions:
             for position in past_positions:
-                if position != [-1,1]:
+                if position.any() != [-1,1]:
                     cv2.circle(img_with_path, np.array(position,dtype="int32"), 2, (0,0,255), -1)
         return img_with_path
 
@@ -597,7 +597,7 @@ class Vision():
         # self.stop_event = threading.Event()
 
     def begin(self, show_which=[1,1,1,1,1,1]):
-        if not self.analysis.initialize_camera(cam_port=0):
+        if not self.analysis.initialize_camera(cam_port=4):
             print("Erreur : Impossible d'initialiser la caméra.")
             return
         self.camera_feed.show_which = show_which
