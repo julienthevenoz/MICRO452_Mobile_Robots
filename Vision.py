@@ -109,11 +109,11 @@ class Analysis:
                 crossing_index = i
                 break
 
-        # Find the threshold
-        if crossing_index != -1:
-            print(f"The highest index where the signal crosses {grad_threshold} is {crossing_index}.")
-        else:
-            print(f"No crossing found before index {highest}.")
+        # # Find the threshold
+        # if crossing_index != -1:
+        #     print(f"The highest index where the signal crosses {grad_threshold} is {crossing_index}.")
+        # else:
+        #     print(f"No crossing found before index {highest}.")
 
         treshold = crossing_index
 
@@ -388,6 +388,7 @@ class Analysis:
         if past_positions:
             for position in past_positions:
                 if position != [-1,1]:
+                    position = np.array(position,dtype="int32")
                     cv2.circle(img_with_path, position, 0, (0,0,255), -1)
         return img_with_path
 
@@ -514,9 +515,8 @@ class CameraFeed(threading.Thread):
                 dijkstra_path_view = top_view
 
                 if self.vision_module.path :
-                    print ("path1 : ", self.vision_module.path)
+                    #print ("path1 : ", self.vision_module.path)
                     dijkstra_path_view = self.vision_module.draw_path_on_image(self.vision_module.path, self.past_positions)
-                    print("Finito with the function")
 
                 #output variables :>
                 # - [x,y,theta] of thymio - [x,y] of goal   -list of obstacle corners (list of list ?)

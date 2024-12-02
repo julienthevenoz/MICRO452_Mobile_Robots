@@ -65,7 +65,7 @@ class GlobalNavigation:
         if current_node == goal:
             path = []
             while current_node:
-                path.append(current_node)
+                path.append(tuple(float(coord) for coord in current_node))
                 current_node = previous_nodes[current_node]
             return path[::-1], current_distance, graph  # Return reversed path and distance
 

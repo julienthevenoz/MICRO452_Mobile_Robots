@@ -29,7 +29,7 @@ class MotionControl:
     self.obstSpeedGain = [0.3, 0.2, -0.1, -0.3, -0.4]
 
     # parameters related to global navigation
-    self.goal_range = 10
+    self.goal_range = 30
 
   def is_obstacle(self, prox_horizontal):
     mark = 0
@@ -83,6 +83,9 @@ class MotionControl:
     delta_x = x_goal - x
     delta_y = y_goal - y
     distance_to_goal = np.sqrt(delta_x ** 2 + delta_y ** 2)
+    
+    print ("distance du but = ", distance_to_goal)
+
     self.distance_to_goal = distance_to_goal
     if distance_to_goal < self.goal_range:
       print('reached goal')
