@@ -47,7 +47,30 @@ class GlobalNavigation:
 # Implement Dijkstra's Algorithm
  def dijkstra(self, thymio, goal, obstacles):
 
-    thymio_x, thymio_y, theta = thymio
+     #if we don't detect goal or thymio, use last saved position
+    if thymio == [] or thymio is None:
+        print(0)
+        if self.last_thymio is None: #was never found, still initialized as None
+           return None, 0, None
+        thymio = self.last_thymio
+    else:
+         #if we have new thymio position, update it
+       self.last_thymio = thymio
+
+    if goal == [] or goal is None:
+       if self.last_goal is None:  #was never found, still initialized as None
+          return None, 0, None 
+       goal = self.last_goal
+    else:
+       self.last_goal = goal
+       
+       
+    try :
+        thymio_x, thymio_y, theta = thymio
+    except : 
+       print(type(thymio), thymio)
+       thymio_x, thymio_y, theta = thymio
+
     start = (thymio_x, thymio_y)
     goal = tuple(goal)
     obstacles = [tuple(obstacle) for obstacle in obstacles]
