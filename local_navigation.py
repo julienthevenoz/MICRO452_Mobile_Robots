@@ -3,8 +3,8 @@ class localNavigation():
   
   def __init__(self):
     
-    self.threshold_high = 1000 
-    self.threshold_low = 300
+    self.threshold_high = 1500 
+    self.threshold_low = 1000
 
   def global_to_local (self, prox_horizontal, state):
     mark = 0

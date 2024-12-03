@@ -207,8 +207,8 @@ class Analysis:
         if markerIds is not None:
             frame_markers = cv2.aruco.drawDetectedMarkers(img.copy(), markerCorners, markerIds)
             #print(f"Detected markers: {markerIds.flatten()}")
-        else:
-            print("no markers")
+        #else:
+        #    print("no markers")
 
         #we want to get rid of the tuple around the array, and the extra dimention it implies
         markerCorners = squeeze(markerCorners)#np.array(markerCorners).squeeze() 
@@ -224,7 +224,7 @@ class Analysis:
         '''
         markers, ids = self.detect_aruco(img)
         if ids is None:
-            print("NO MARKERS DETECTED")
+            #print("NO MARKERS DETECTED")
             return None, None
         #print(f"Detected {len(ids)} markers : {list(squeeze(ids))}")
         if markers.shape == (0,):
@@ -424,7 +424,7 @@ class Analysis:
 
         #if no markers have been detected
         if ids is None:
-            print("(get_2_markers) Thymio and Goal markers not detected")
+            #print("(get_2_markers) Thymio and Goal markers not detected")
             return None, None
         else:
             # # Verify that we have at least the two desired markers
@@ -435,7 +435,7 @@ class Analysis:
                 # print("(get_2_markers) Thymio not detected")
                 return None, markers
             if not(5 in ids):
-                print("(get_2_markers) Goal not detected")
+                #print("(get_2_markers) Goal not detected")
                 return markers, None
 
         # Identify markers by their IDs: assume Thymio (e.g., ID=4) and Goal (e.g., ID=5)
@@ -547,8 +547,8 @@ class CameraFeed(threading.Thread):
                     goal_position = self.analysis.detect_goal_position(goal_marker)
                     if Thymio_marker is not None:
                         top_view = cv2.arrowedLine(top_view.copy(), np.array(robot_pose[:2],dtype='int32'), np.array(goal_position, dtype='int32'), (255, 0, 0), 8)
-                else:
-                    print("Goal not detected")
+                #else:
+                #    print("Goal not detected")
 
                 #update attributes
                 self.obstacle_corners = obstacle_corners

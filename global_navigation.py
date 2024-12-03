@@ -71,7 +71,7 @@ class GlobalNavigation:
     try :
         thymio_x, thymio_y, theta = thymio
     except : 
-       print(type(thymio), thymio)
+       print("Qu'estce a direque ceci",type(thymio), thymio)
        thymio_x, thymio_y, theta = thymio
 
     start = (thymio_x, thymio_y)

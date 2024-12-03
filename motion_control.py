@@ -78,13 +78,13 @@ class MotionControl:
   #   return v, omega
 
   def path_tracking(self, robot_state, goal_point):
-    print('hi')
+    #print('hi')
     if not robot_state or not goal_point:
       return False
     x, y, theta = robot_state
     
     theta = -theta
-    print(theta)
+    #print(theta)
     x_goal, y_goal = goal_point
     delta_x = x_goal - x
     delta_y = y_goal - y
@@ -92,7 +92,7 @@ class MotionControl:
     self.distance_to_goal = distance_to_goal
     
     # if distance_to_goal < self.goal_range:
-    #   print('reached goal')
+    #   #print('reached goal')
     #   return True
     angle_to_goal = np.arctan2(-delta_y, delta_x)
     
@@ -105,8 +105,8 @@ class MotionControl:
       alpha = alpha + 2 * np.pi
 
     print(angle_to_goal)
-    print(alpha)
-    print(beta)
+    #print(alpha)
+    #print(beta)
     # angle_error = angle_to_goal - theta
     # v = self.Ka * self.distance_to_goal * np.cos(math.degrees(angle_error))
     # omega = self.Kb * math.degrees(angle_error) + self.Ka * (np.cos(math.degrees(angle_error)) * np.sin(math.degrees(angle_error)))
@@ -117,7 +117,9 @@ class MotionControl:
     if(self.distance_to_goal > 500):
       v = 250 * self.wheel_radis
     if(self.distance_to_goal < 50):
+      print ("moins de  du but suivant")
       v = 150 * self.wheel_radis
+      print ("motor speed", v)
     if(self.distance_to_goal < 5):
       v_L = int((self.L * omega / 2) / self.wheel_radis)
       v_R = int((self.L * omega / 2) / self.wheel_radis)
@@ -127,7 +129,7 @@ class MotionControl:
     v_R = int((v + (self.L * omega / 2)) / self.wheel_radis)
     
     self.set_motor_speed(v_L, v_R)
-    print(angle_to_goal,omega)
+    #print(angle_to_goal,omega)
     return False
 
   def get_motor_speed(self):
