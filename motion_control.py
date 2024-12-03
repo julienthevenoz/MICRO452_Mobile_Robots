@@ -8,13 +8,13 @@ class MotionControl:
   '''
   def __init__(self, thymio):
     # important parameter to adjust
-    self.Ka = 100
+    self.Ka = 50
     self.Kb = 0
-    self.Kp = 40
+    self.Kp = 20
 
     # speed limit
     self.max_velocity = 5000
-    self.max_omega = 1000
+    self.max_omega = 100
 
     # units: mm
     self.wheel_radis = 20
@@ -84,7 +84,7 @@ class MotionControl:
     x, y, theta = robot_state
     
     theta = -theta
-    #print(theta)
+    print("theta = ", theta)
     x_goal, y_goal = goal_point
     delta_x = x_goal - x
     delta_y = y_goal - y
@@ -105,32 +105,44 @@ class MotionControl:
       alpha = alpha + 2 * np.pi
 
     #print(angle_to_goal)
-    #print(alpha)
+    print("alpha = ", alpha)
     #print(beta)
     # angle_error = angle_to_goal - theta
     # v = self.Ka * self.distance_to_goal * np.cos(math.degrees(angle_error))
     # omega = self.Kb * math.degrees(angle_error) + self.Ka * (np.cos(math.degrees(angle_error)) * np.sin(math.degrees(angle_error)))
 
     v = self.Kp * self.distance_to_goal
-    print ("vitesse lineaire finale", v)
+    #v = 1000
+    print ("vitesse lineaire de base ", v)
     omega = self.Ka * alpha + self.Kb * beta
-    print ("vitesse angulaire finale", v)
+    #print ("omega = ", omega)
+    #print ("vitesse angulaire finale", v)
 
     # v = max(-self.max_velocity, min(v, self.max_velocity))
     # omega = max(-self.max_omega, min(omega, self.max_omega))
+    print("distance du but", self.distance_to_goal)
     if(self.distance_to_goal > 500):
       v = 250 * self.wheel_radis
-    if(self.distance_to_goal < 50):
-      v = 150 * self.wheel_radis
-      print ("motor speed", v)
-    if(self.distance_to_goal < 5):
+      #print ("motor speed loin ", v)
+    elif(self.distance_to_goal < 50):
+      v = 100 * self.wheel_radis
+      #print ("motor speed proche", v)
+    
+    if(self.distance_to_goal < 10):
+      print ("je suis arrivé au but")
       v_L = int((self.L * omega / 2) / self.wheel_radis)
       v_R = int((self.L * omega / 2) / self.wheel_radis)
       print ("V left = ", v_L, "V right = ", v_R,)
       self.set_motor_speed(v_L, v_R)
       return True
     v_L =  int((v - (self.L * omega / 2)) / self.wheel_radis)
+    #print ("motor speed left ", v_L)
+    #print ("omga revisité = ", (self.L * omega / 2))
     v_R = int((v + (self.L * omega / 2)) / self.wheel_radis)
+    #print ("motor speed right", v_L)
+
+    #forward_speed = self.__KAPPA_RHO * rho
+    #turning_velocity = -(self.__WHEEL_DISTANCE / 2) * (self.__KAPPA_ALPHA * alpha + self.__KAPPA_BETA * beta)
     
     self.set_motor_speed(v_L, v_R)
     #print(angle_to_goal,omega)
