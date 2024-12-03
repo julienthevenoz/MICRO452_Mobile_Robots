@@ -13,9 +13,10 @@ import time
 class GlobalNavigation:
 
  def __init__(self):
-  self.margin = 25
+  self.margin = 40
   self.last_thymio = None
   self.last_goal = None
+            
             
 
  def getObstacles(self, start, goal, obstacles):
@@ -49,7 +50,7 @@ class GlobalNavigation:
 # Implement Dijkstra's Algorithm
  def dijkstra(self, thymio, goal, obstacles):
 
-    #if we don't detect goal or thymio, use last saved position
+     #if we don't detect goal or thymio, use last saved position
     if thymio == [] or thymio is None:
         print(0)
         if self.last_thymio is None: #was never found, still initialized as None
@@ -70,8 +71,9 @@ class GlobalNavigation:
     try :
         thymio_x, thymio_y, theta = thymio
     except : 
-       print(type(thymio), thymio)
+       print("Qu'estce a direque ceci",type(thymio), thymio)
        thymio_x, thymio_y, theta = thymio
+
     start = (thymio_x, thymio_y)
     goal = tuple(goal)
     obstacles = [tuple(obstacle) for obstacle in obstacles]
@@ -151,11 +153,14 @@ class GlobalNavigation:
          path_y = [point[1] for point in path]
          ax.plot(path_x, path_y, 'b-', label="Path")
 
+     plt.gca().invert_yaxis()
+
      ax.set_xlabel('X')
      ax.set_ylabel('Y')
      ax.set_title('Dijkstra Path Planning')
      ax.legend()
-
+     
+        
      plt.show()
 
 # Test function for the GlobalNavigation class

@@ -50,6 +50,7 @@ class Analysis:
         self.path = None
 
     def initialize_camera(self, cam_port=0):
+    def initialize_camera(self, cam_port=0):
         """Initialise la caméra"""
         self.cam = cv2.VideoCapture(cam_port)
         if not self.cam.isOpened():
@@ -108,7 +109,7 @@ class Analysis:
         obstacles = np.uint8(mask * 255)
 
         # 5. Process connected components
-        COUNT = 2000  # Minimum size threshold for components
+        COUNT = 3000  # Minimum size threshold for components
         num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(obstacles, connectivity=8)
         filtered_mask = np.zeros_like(obstacles)
 
@@ -193,8 +194,8 @@ class Analysis:
         if markerIds is not None:
             frame_markers = cv2.aruco.drawDetectedMarkers(img.copy(), markerCorners, markerIds)
             #print(f"Detected markers: {markerIds.flatten()}")
-        else:
-            print("no markers")
+        #else:
+        #    print("no markers")
 
         #we want to get rid of the tuple around the array, and the extra dimention it implies
         markerCorners = squeeze(markerCorners)#np.array(markerCorners).squeeze() 
@@ -210,7 +211,7 @@ class Analysis:
         '''
         markers, ids = self.detect_aruco(img)
         if ids is None:
-            print("NO MARKERS DETECTED")
+            #print("NO MARKERS DETECTED")
             return None, None
         #print(f"Detected {len(ids)} markers : {list(squeeze(ids))}")
         if markers.shape == (0,):
@@ -410,7 +411,7 @@ class Analysis:
 
         #if no markers have been detected
         if ids is None:
-            print("(get_2_markers) Thymio and Goal markers not detected")
+            #print("(get_2_markers) Thymio and Goal markers not detected")
             return None, None
         else:
             # # Verify that we have at least the two desired markers
@@ -418,10 +419,10 @@ class Analysis:
             #     print(f"(get_2_markers) Detected {len(ids)} markers instead of at least 2.")
             #     #return markers.squeeze(), ids.squeeze()
             if not(4 in ids):
-                print("get_2_markers) Thymio not detected")
+                # print("(get_2_markers) Thymio not detected")
                 return None, markers
             if not(5 in ids):
-                print("(get_2_markers) Goal not detected")
+                #print("(get_2_markers) Goal not detected")
                 return markers, None
 
         # Identify markers by their IDs: assume Thymio (e.g., ID=4) and Goal (e.g., ID=5)
@@ -469,6 +470,7 @@ class CameraFeed(threading.Thread):
     def __init__(self, analysis_module):
         super().__init__()
         self.analysis = analysis_module
+        self.analysis = analysis_module
         self.stop_event = threading.Event()
         self.robot_pose = []
         self.goal_position = []
@@ -479,6 +481,7 @@ class CameraFeed(threading.Thread):
     def run(self):
         while not self.stop_event.is_set():
             frame = self.analysis.capture_frame()
+            frame = self.analysis.capture_frame()
             if frame is not None:
 
 
@@ -486,6 +489,8 @@ class CameraFeed(threading.Thread):
                 if self.analysis.frame_viz is None:
                     self.analysis.frame_viz = frame
 
+                annotated_img = self.analysis.frame_viz
+                top_view = self.analysis.top_view
                 annotated_img = self.analysis.frame_viz
                 top_view = self.analysis.top_view
                 dijkstra_path_view = top_view
@@ -503,7 +508,9 @@ class CameraFeed(threading.Thread):
                 obstacle_corners, filtered_mask, img_with_polygons = self.analysis.detect_obstacle_corners(top_view)
 
                 Thymio_marker, goal_marker = self.analysis.get_2_markers(top_view)
+                Thymio_marker, goal_marker = self.analysis.get_2_markers(top_view)
                 if Thymio_marker is not None: 
+                    robot_pose= self.analysis.detect_thymio_pose(Thymio_marker)  
                     robot_pose= self.analysis.detect_thymio_pose(Thymio_marker)  
 
                     arrow_length = 100
@@ -512,14 +519,15 @@ class CameraFeed(threading.Thread):
                     end_y = int(robot_pose[1] + arrow_length * np.sin(robot_pose[2]))
                     top_view = cv2.arrowedLine(top_view.copy(), np.array(robot_pose[:2],dtype='int32'), (end_x, end_y), (0, 0, 255), 5)
                 else:
-                    print("Thymio not detected")
+                     print("Thymio not detected")
            
                 if goal_marker is not None:
                     goal_position = self.analysis.detect_goal_position(goal_marker)
+                    goal_position = self.analysis.detect_goal_position(goal_marker)
                     if Thymio_marker is not None:
                         top_view = cv2.arrowedLine(top_view.copy(), np.array(robot_pose[:2],dtype='int32'), np.array(goal_position, dtype='int32'), (255, 0, 0), 8)
-                else:
-                    print("Goal not detected")
+                #else:
+                #    print("Goal not detected")
 
                 #update attributes
                 self.obstacle_corners = obstacle_corners
@@ -558,6 +566,7 @@ class CameraFeed(threading.Thread):
         """Arrêter le thread et libérer la caméra"""
         self.stop_event.set()
         self.analysis.release_camera()
+        self.analysis.release_camera()
 
 class Vision():
     """Thread pour capturer et afficher un flux vidéo constant"""
@@ -567,6 +576,7 @@ class Vision():
         self.camera_feed = CameraFeed(self.analysis)
 
     def begin(self, show_which=[1,1,1,1,1,1]):
+        if not self.analysis.initialize_camera(cam_port=4):
         if not self.analysis.initialize_camera(cam_port=4):
             print("Erreur : Impossible d'initialiser la caméra.")
             return
