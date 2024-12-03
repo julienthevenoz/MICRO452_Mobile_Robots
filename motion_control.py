@@ -1,7 +1,7 @@
 import numpy as np
 from robot_api import Thymio
 from tdmclient import ClientAsync
-import math
+import time
 class MotionControl:
   '''
   Control method: Proportional Control for Differential Drive Robots
@@ -147,6 +147,15 @@ class MotionControl:
     self.set_motor_speed(v_L, v_R)
     #print(angle_to_goal,omega)
     return False
+
+  def get_displacement(self):
+    motor_speed = self.get_motor_speed()
+    self.end_time = time.time()
+    time_step = self.end_time - self.start_time
+    vl_displacement = motor_speed[0] * 0.417 * time_step * 0.563  # 600/1065
+    vr_displacement = motor_speed[1] * 0.417 * time_step * 0.446  # 300/673
+    self.start_time = time.time()
+    return vl_displacement, vr_displacement
 
   def get_motor_speed(self):
     motor_speed = self.thymio.read_motors_speed()

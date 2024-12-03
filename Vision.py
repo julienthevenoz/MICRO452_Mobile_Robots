@@ -357,6 +357,7 @@ class Analysis:
         #print(f"{len(corners)} detected corners, {in_memory} corners stored")
 
     def draw_path_on_image(self, path, past_kalman_estimates=[]):
+    def draw_path_on_image(self, path, past_kalman_estimates=[]):
         """
         Dessine le chemin calculé par Dijkstra sur l'image donnée.
         Draw the dijsktra path in green on the image, and all past positions (path already travelled) as red dots.
@@ -365,6 +366,8 @@ class Analysis:
         :param path: Liste des points [x, y] représentant le chemin
         :return: Image avec le chemin dessiné
         """
+        print("drawing path", path, past_kalman_estimates
+        )
         img_with_path = self.top_view.copy()
         for i in range(len(path) - 1):
             start = tuple(map(int, path[i]))
@@ -495,9 +498,11 @@ class CameraFeed(threading.Thread):
                 top_view = self.analysis.top_view
                 dijkstra_path_view = top_view
 
-                if self.analysis.path :
-                    dijkstra_path_view = self.analysis.draw_path_on_image(self.analysis.path, self.past_kalman_estimates)
-
+                if self.vision_module.path :
+                    dijkstra_path_view = self.vision_module.draw_path_on_image(self.vision_module.path, self.past_kalman_estimates
+                    )
+                else:
+                    print("No path")
                 #output variables :>
                 # - [x,y,theta] of thymio - [x,y] of goal   -list of obstacle corners (list of list ?)
                 #if they have not been detected, will return empty list []
