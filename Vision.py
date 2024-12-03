@@ -34,20 +34,6 @@ def squeeze(iterable,type=None):
         
         return array
 
-##### deprecated ?
-def show_img_Julien(img, title, wait_ms=1):
-    cv2.namedWindow(title, cv2.WINDOW_NORMAL)
-    cv2.imshow(title, img)
-    # This allows the window to refresh without blocking the program
-    key = cv2.waitKey(wait_ms) & 0xFF
-    # Optionally handle 'q' to quit the display loop in the main program
-    if key == ord('q'):
-        return False
-    return True        
-#### deprecated ?
-def show_img(img, title):
-    cv2.namedWindow(title, cv2.WINDOW_NORMAL)
-    cv2.imshow(title, img)
 
 class Analysis:
     """Module de gestion de la caméra et analyse d'image"""
@@ -369,7 +355,7 @@ class Analysis:
 
         #print(f"{len(corners)} detected corners, {in_memory} corners stored")
 
-    def draw_path_on_image(self, path, past_positions=[]):
+    def draw_path_on_image(self, path, past_kalman_estimates=[]):
         """
         Dessine le chemin calculé par Dijkstra sur l'image donnée.
         Draw the dijsktra path in green on the image, and all past positions (path already travelled) as red dots.
@@ -385,8 +371,8 @@ class Analysis:
             cv2.line(img_with_path, start, end, (0, 255, 0), 2)  # Vert pour le chemin
         
         #draw red points for points already travelled
-        if past_positions:
-            for position in past_positions:
+        if past_kalman_estimates:
+            for position in past_kalman_estimates:
                 if position != [-1,1]:
                     cv2.circle(img_with_path, np.array(position,dtype="int32"), 2, (0,0,255), -1)
         return img_with_path
@@ -455,7 +441,7 @@ class Analysis:
             #return False
         return thymio_marker, goal_marker
 
-    def julien_main(self, img):
+    def resize_image(self, img):
         ''' ThIS SHOULD NOT STAY ! I only put it as an example of how my code is supposed to be used '''
 
         #get location of 6 markers (and their ids) in camera frame
@@ -482,39 +468,30 @@ class CameraFeed(threading.Thread):
     """Thread pour capturer et afficher un flux vidéo constant"""
     def __init__(self, analysis_module):
         super().__init__()
-        self.vision_module = analysis_module
+        self.analysis = analysis_module
         self.stop_event = threading.Event()
         self.robot_pose = []
         self.goal_position = []
         self.obstacle_corners = []
         self.show_which = [1,1,1,1,1,1]
-        self.past_positions = []
-
-    # def get_thymio_goal_and_obstacles(self):
-    #     '''Returns [x,y,theta] of thymio, [x,y] of goal and list of obstacle 
-    #     corners = [[corner1,corner2],[corner1,corner2,corner3,corner4],[corner1,corner2,corner3]]
-    #     where cornerX is itself a list of two coordinates [x_corner1,y_corner1].
-    #     If the corresponding markers are not detected, returns empty lists []'''
-    #     return self.robot_pose, self.goal_position, self.obstacle_corners
+        self.past_kalman_estimates = []
 
     def run(self):
         while not self.stop_event.is_set():
-            frame = self.vision_module.capture_frame()
+            frame = self.analysis.capture_frame()
             if frame is not None:
-                # Utilisation de la méthode d'analyse de Analysis
-                #processed_frame = self.vision_module.analyze_frame(frame)
-                # Appeler la méthode pour détecter les coins des obstacles
 
-                self.vision_module.julien_main(frame)
-                if self.vision_module.frame_viz is None:
-                    self.vision_module.frame_viz = frame
 
-                annotated_img = self.vision_module.frame_viz
-                top_view = self.vision_module.top_view
+                self.analysis.resize_image(frame)
+                if self.analysis.frame_viz is None:
+                    self.analysis.frame_viz = frame
+
+                annotated_img = self.analysis.frame_viz
+                top_view = self.analysis.top_view
                 dijkstra_path_view = top_view
 
-                if self.vision_module.path :
-                    dijkstra_path_view = self.vision_module.draw_path_on_image(self.vision_module.path, self.past_positions)
+                if self.analysis.path :
+                    dijkstra_path_view = self.analysis.draw_path_on_image(self.analysis.path, self.past_kalman_estimates)
 
                 #output variables :>
                 # - [x,y,theta] of thymio - [x,y] of goal   -list of obstacle corners (list of list ?)
@@ -523,17 +500,11 @@ class CameraFeed(threading.Thread):
                 goal_position = []
                 obstacle_corners = []
 
+                obstacle_corners, filtered_mask, img_with_polygons = self.analysis.detect_obstacle_corners(top_view)
 
-                #! alternative : if not detected, will return last known pose and goal instead
-                #! Julien thinks it's not a good idea
-                # robot_pose = self.vision_module.last_thymio_pose
-                # goal_position = self.vision_module.last_goal_posq
-
-                obstacle_corners, filtered_mask, img_with_polygons = self.vision_module.detect_obstacle_corners(top_view)
-
-                Thymio_marker, goal_marker = self.vision_module.get_2_markers(top_view)
+                Thymio_marker, goal_marker = self.analysis.get_2_markers(top_view)
                 if Thymio_marker is not None: 
-                    robot_pose= self.vision_module.detect_thymio_pose(Thymio_marker)  
+                    robot_pose= self.analysis.detect_thymio_pose(Thymio_marker)  
 
                     arrow_length = 100
                     # Calculate the end point of the arrow using the angle theta
@@ -544,7 +515,7 @@ class CameraFeed(threading.Thread):
                     print("Thymio not detected")
            
                 if goal_marker is not None:
-                    goal_position = self.vision_module.detect_goal_position(goal_marker)
+                    goal_position = self.analysis.detect_goal_position(goal_marker)
                     if Thymio_marker is not None:
                         top_view = cv2.arrowedLine(top_view.copy(), np.array(robot_pose[:2],dtype='int32'), np.array(goal_position, dtype='int32'), (255, 0, 0), 8)
                 else:
@@ -555,11 +526,11 @@ class CameraFeed(threading.Thread):
                 self.robot_pose = robot_pose
                 self.goal_position = goal_position
 
-                #update past_positions:
+                #update past_kalman_estimates:
                 if robot_pose:
-                    self.past_positions.append(robot_pose[:2])
+                    self.past_kalman_estimates.append(robot_pose[:2])
                 else:
-                    self.past_positions.append([-1,-1])
+                    self.past_kalman_estimates.append([-1,-1])
                 
                 videofeeds_list = [frame, filtered_mask, img_with_polygons, annotated_img, top_view, dijkstra_path_view]
                 titles_list = ["Original", "filtered_mask", "Processed_with_polygones", "Highlighting corners", "thymio Oops, baby", "dijkstra_path_view"]
@@ -586,7 +557,7 @@ class CameraFeed(threading.Thread):
     def stop(self):
         """Arrêter le thread et libérer la caméra"""
         self.stop_event.set()
-        self.vision_module.release_camera()
+        self.analysis.release_camera()
 
 class Vision():
     """Thread pour capturer et afficher un flux vidéo constant"""
@@ -594,7 +565,6 @@ class Vision():
     # Instantiate CameraFeed and Analysis
         self.analysis = Analysis()
         self.camera_feed = CameraFeed(self.analysis)
-        # self.stop_event = threading.Event()
 
     def begin(self, show_which=[1,1,1,1,1,1]):
         if not self.analysis.initialize_camera(cam_port=4):
@@ -618,30 +588,8 @@ class Vision():
 
 
 def main():
-    # """Point d'entrée principal"""
-    # vision = Analysis()
-    # if not vision.initialize_camera(cam_port=4):
-    #     print("Erreur : Impossible d'initialiser la caméra.")
-    #     return
-
-    # camera_thread = CameraFeed(vision)
-    # camera_thread.start()
-
-    # try:
-    #     while True:
-    #         # Vous pouvez exécuter d'autres tâches en parallèle ici
-    #         # Le programme principal continue de tourner sans bloquer l'affichage
-    #         print("Le programme principal fonctionne en arrière-plan...")
-    #         time.sleep(1)
-    # except KeyboardInterrupt:
-    #     print("Arrêt du programme demandé.")
-    # finally:
-    #     camera_thread.stop()
-    #     camera_thread.join()
-    #     print("Programme terminé.")
     visio = Vision()
     visio.begin()
-    #show_many_img([visio.analysis.frame], ["titre"])
 
 
 if __name__ == "__main__":
@@ -649,39 +597,3 @@ if __name__ == "__main__":
 
 
 
-##################################################################
-##################################################################
-"""
-
-class Vision_module():
-    
-    def modify_image_for_visualization(self, img, obstacle_corners, tymio_position, tymio_radius=40):
-        ""
-        Modifie l'image en mettant le fond en bleu, les obstacles en noir, et le Tymio en blanc.
-        
-        :param img: L'image originale.
-        :param obstacle_corners: Liste des coins des polygones représentant les obstacles.
-        :param tymio_position: Position du Tymio dans l'image (x, y).
-        :param tymio_radius: Rayon approximatif du Tymio pour dessiner un cercle autour de lui.
-        :return: L'image modifiée.
-        ""
-        # Vérifier si l'image a été correctement chargée
-        if img is None:
-            raise ValueError("L'image n'a pas pu être chargée. Veuillez vérifier le chemin du fichier.")
-    
-        # Créer une image bleue (fond bleu)
-        modified_img = np.zeros_like(img)  # Créer une image de la même taille que 'img'
-        modified_img[:, :] = (220, 220, 0)  # Bleu en BGR
-        
-        # Dessiner les obstacles en noir (polygones définis par obstacle_corners)
-        for corners in obstacle_corners:
-            # Convertir les coins en array numpy et dessiner chaque polygone
-            poly_points = np.array(corners, np.int32)
-            poly_points = poly_points.reshape((-1, 1, 2))
-            cv2.fillPoly(modified_img, [poly_points], (0, 0, 0))  # Noir pour les obstacles
-        
-        # Dessiner le Tymio en blanc (cercle autour de la position du Tymio)
-        #cv2.circle(modified_img, tymio_position, tymio_radius, (255, 255, 255), -1)  # Blanc pour le Tymio
-        
-        return modified_img
-"""
