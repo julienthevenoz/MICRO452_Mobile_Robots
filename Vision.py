@@ -50,7 +50,6 @@ class Analysis:
         self.path = None
 
     def initialize_camera(self, cam_port=0):
-    def initialize_camera(self, cam_port=0):
         """Initialise la caméra"""
         self.cam = cv2.VideoCapture(cam_port)
         if not self.cam.isOpened():
@@ -362,7 +361,6 @@ class Analysis:
         #print(f"{len(corners)} detected corners, {in_memory} corners stored")
 
     def draw_path_on_image(self, path, past_kalman_estimates=[]):
-    def draw_path_on_image(self, path, past_kalman_estimates=[]):
         """
         Dessine le chemin calculé par Dijkstra sur l'image donnée.
         Draw the dijsktra path in green on the image, and all past positions (path already travelled) as red dots.
@@ -501,8 +499,8 @@ class CameraFeed(threading.Thread):
                 top_view = self.analysis.top_view
                 dijkstra_path_view = top_view
 
-                if self.vision_module.path :
-                    dijkstra_path_view = self.vision_module.draw_path_on_image(self.vision_module.path, self.past_kalman_estimates
+                if self.analysis.path :
+                    dijkstra_path_view = self.analysis.draw_path_on_image(self.analysis.path, self.past_kalman_estimates
                     )
                 else:
                     print("No path")
@@ -584,7 +582,7 @@ class Vision():
         self.camera_feed = CameraFeed(self.analysis)
 
     def begin(self, show_which=[1,1,1,1,1,1]):
-        if not self.analysis.initialize_camera(cam_port=4):
+        if not self.analysis.initialize_camera(cam_port=0):
             print("Erreur : Impossible d'initialiser la caméra.")
             return
         self.camera_feed.show_which = show_which
