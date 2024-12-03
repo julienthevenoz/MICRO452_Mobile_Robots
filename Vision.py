@@ -63,7 +63,7 @@ class Analysis:
         self.last_goal_pos = None
         self.path = None
 
-    def initialize_camera(self, cam_port=4):
+    def initialize_camera(self, cam_port=0):
         """Initialise la caméra"""
         self.cam = cv2.VideoCapture(cam_port)
         if not self.cam.isOpened():
