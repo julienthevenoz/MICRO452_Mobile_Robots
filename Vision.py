@@ -432,7 +432,7 @@ class Analysis:
             #     print(f"(get_2_markers) Detected {len(ids)} markers instead of at least 2.")
             #     #return markers.squeeze(), ids.squeeze()
             if not(4 in ids):
-                print("get_2_markers) Thymio not detected")
+                # print("(get_2_markers) Thymio not detected")
                 return None, markers
             if not(5 in ids):
                 print("(get_2_markers) Goal not detected")
@@ -482,7 +482,7 @@ class CameraFeed(threading.Thread):
     """Thread pour capturer et afficher un flux vidéo constant"""
     def __init__(self, analysis_module):
         super().__init__()
-        self.vision_module = analysis_module
+        self.analysis = analysis_module
         self.stop_event = threading.Event()
         self.robot_pose = []
         self.goal_position = []
@@ -499,22 +499,22 @@ class CameraFeed(threading.Thread):
 
     def run(self):
         while not self.stop_event.is_set():
-            frame = self.vision_module.capture_frame()
+            frame = self.analysis.capture_frame()
             if frame is not None:
                 # Utilisation de la méthode d'analyse de Analysis
-                #processed_frame = self.vision_module.analyze_frame(frame)
+                #processed_frame = self.analysis.analyze_frame(frame)
                 # Appeler la méthode pour détecter les coins des obstacles
 
-                self.vision_module.julien_main(frame)
-                if self.vision_module.frame_viz is None:
-                    self.vision_module.frame_viz = frame
+                self.analysis.julien_main(frame)
+                if self.analysis.frame_viz is None:
+                    self.analysis.frame_viz = frame
 
-                annotated_img = self.vision_module.frame_viz
-                top_view = self.vision_module.top_view
+                annotated_img = self.analysis.frame_viz
+                top_view = self.analysis.top_view
                 dijkstra_path_view = top_view
 
-                if self.vision_module.path :
-                    dijkstra_path_view = self.vision_module.draw_path_on_image(self.vision_module.path, self.past_positions)
+                if self.analysis.path :
+                    dijkstra_path_view = self.analysis.draw_path_on_image(self.analysis.path, self.past_positions)
 
                 #output variables :>
                 # - [x,y,theta] of thymio - [x,y] of goal   -list of obstacle corners (list of list ?)
@@ -526,14 +526,14 @@ class CameraFeed(threading.Thread):
 
                 #! alternative : if not detected, will return last known pose and goal instead
                 #! Julien thinks it's not a good idea
-                # robot_pose = self.vision_module.last_thymio_pose
-                # goal_position = self.vision_module.last_goal_posq
+                # robot_pose = self.analysis.last_thymio_pose
+                # goal_position = self.analysis.last_goal_posq
 
-                obstacle_corners, filtered_mask, img_with_polygons = self.vision_module.detect_obstacle_corners(top_view)
+                obstacle_corners, filtered_mask, img_with_polygons = self.analysis.detect_obstacle_corners(top_view)
 
-                Thymio_marker, goal_marker = self.vision_module.get_2_markers(top_view)
+                Thymio_marker, goal_marker = self.analysis.get_2_markers(top_view)
                 if Thymio_marker is not None: 
-                    robot_pose= self.vision_module.detect_thymio_pose(Thymio_marker)  
+                    robot_pose= self.analysis.detect_thymio_pose(Thymio_marker)  
 
                     arrow_length = 100
                     # Calculate the end point of the arrow using the angle theta
@@ -541,10 +541,10 @@ class CameraFeed(threading.Thread):
                     end_y = int(robot_pose[1] + arrow_length * np.sin(robot_pose[2]))
                     top_view = cv2.arrowedLine(top_view.copy(), np.array(robot_pose[:2],dtype='int32'), (end_x, end_y), (0, 0, 255), 5)
                 else:
-                    print("Thymio not detected")
+                     print("Thymio not detected")
            
                 if goal_marker is not None:
-                    goal_position = self.vision_module.detect_goal_position(goal_marker)
+                    goal_position = self.analysis.detect_goal_position(goal_marker)
                     if Thymio_marker is not None:
                         top_view = cv2.arrowedLine(top_view.copy(), np.array(robot_pose[:2],dtype='int32'), np.array(goal_position, dtype='int32'), (255, 0, 0), 8)
                 else:
@@ -586,7 +586,7 @@ class CameraFeed(threading.Thread):
     def stop(self):
         """Arrêter le thread et libérer la caméra"""
         self.stop_event.set()
-        self.vision_module.release_camera()
+        self.analysis.release_camera()
 
 class Vision():
     """Thread pour capturer et afficher un flux vidéo constant"""
@@ -597,7 +597,7 @@ class Vision():
         # self.stop_event = threading.Event()
 
     def begin(self, show_which=[1,1,1,1,1,1]):
-        if not self.analysis.initialize_camera(cam_port=0):
+        if not self.analysis.initialize_camera(cam_port=4):
             print("Erreur : Impossible d'initialiser la caméra.")
             return
         self.camera_feed.show_which = show_which
