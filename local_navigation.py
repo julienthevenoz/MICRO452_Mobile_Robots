@@ -3,8 +3,8 @@ class localNavigation():
   
   def __init__(self):
     
-    self.threshold_high = 1500 
-    self.threshold_low = 1000
+    self.threshold_high = 2000 
+    self.threshold_low = 300
 
   def global_to_local (self, prox_horizontal, state):
     mark = 0
@@ -28,7 +28,6 @@ class localNavigation():
 
     sensor_scale = 800
 
-    
     x = [0,0,0,0,0,0,0,0,0]
     
     x[7] = y[0] // 20

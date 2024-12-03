@@ -8,9 +8,9 @@ class MotionControl:
   '''
   def __init__(self, thymio):
     # important parameter to adjust
-    self.Ka = 50
+    self.Ka = 100
     self.Kb = 0
-    self.Kp = 20
+    self.Kp = 40
 
     # speed limit
     self.max_velocity = 5000
@@ -97,32 +97,36 @@ class MotionControl:
     angle_to_goal = np.arctan2(-delta_y, delta_x)
     
     alpha = - theta + angle_to_goal
-    beta = - theta - alpha
+    beta = - (theta + alpha)
 
     if(alpha > np.pi):
       alpha = alpha - 2 *np.pi
     elif (alpha < -np.pi):
       alpha = alpha + 2 * np.pi
 
-    print(angle_to_goal)
+    #print(angle_to_goal)
     #print(alpha)
     #print(beta)
     # angle_error = angle_to_goal - theta
     # v = self.Ka * self.distance_to_goal * np.cos(math.degrees(angle_error))
     # omega = self.Kb * math.degrees(angle_error) + self.Ka * (np.cos(math.degrees(angle_error)) * np.sin(math.degrees(angle_error)))
+
     v = self.Kp * self.distance_to_goal
+    print ("vitesse lineaire finale", v)
     omega = self.Ka * alpha + self.Kb * beta
+    print ("vitesse angulaire finale", v)
+
     # v = max(-self.max_velocity, min(v, self.max_velocity))
     # omega = max(-self.max_omega, min(omega, self.max_omega))
     if(self.distance_to_goal > 500):
       v = 250 * self.wheel_radis
     if(self.distance_to_goal < 50):
-      print ("moins de  du but suivant")
       v = 150 * self.wheel_radis
       print ("motor speed", v)
     if(self.distance_to_goal < 5):
       v_L = int((self.L * omega / 2) / self.wheel_radis)
       v_R = int((self.L * omega / 2) / self.wheel_radis)
+      print ("V left = ", v_L, "V right = ", v_R,)
       self.set_motor_speed(v_L, v_R)
       return True
     v_L =  int((v - (self.L * omega / 2)) / self.wheel_radis)
@@ -147,3 +151,47 @@ class MotionControl:
   def read_prox_sensors(self):
     prox = self.thymio.read_prox_sensors()
     return prox
+
+
+  # def apply_motor_command_owen(self, robot_state, goal_point):
+  #       """
+  #       Applies the astolfi command in accordance to the goal and the position we have given to
+  #       """
+  #       KAPPA_RHO = 1
+  #       KAPPA_ALPHA = 300 * 6
+  #       KAPPA_BETA = -70 * 0.2
+  #       WHEEL_DISTANCE = 0.09  # in m
+  #       if not robot_state or not goal_point:
+  #         return False
+  #       x, y, theta = robot_state
+        
+  #       theta = -theta
+  #       #print(theta)
+  #       x_goal, y_goal = goal_point
+  #       delta_x = x_goal - x
+  #       delta_y = y_goal - y
+      
+  #       rho = np.sqrt(delta_x** 2 + delta_y ** 2)
+  #       if rho < self.goal_range:
+  #           self.on_objective = True
+  #           return
+  #       # we add np.pi to position[2] in order to adapt to alstofy referential
+  #       alpha = self.convert_angle(-theta + np.pi + np.arctan2(-delta_y, delta_x))
+  #       beta = self.convert_angle(-theta - alpha + np.pi)
+  #       forward_speed = KAPPA_RHO * rho
+  #       turning_velocity = -(WHEEL_DISTANCE / 2) * (KAPPA_ALPHA * alpha + KAPPA_BETA * beta)
+  #       if forward_speed > 150:
+  #           turning_velocity *= 150 / forward_speed
+  #           forward_speed = 150
+
+  #       movement_array = [-turning_velocity + forward_speed, turning_velocity + forward_speed]
+  #       self.set_motor_speed(int(np.floor(movement_array[1])),
+  #                             int(np.floor(movement_array[0])))
+  #       return False
+
+  # def convert_angle(self, angle):
+  #   #convert angle to rad and limit to -pi to pi
+  #   angle = angle % (2*np.pi)
+  #   if angle >= np.pi:
+  #       angle -= 2*np.pi
+  #   return angle
