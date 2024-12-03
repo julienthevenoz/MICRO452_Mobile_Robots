@@ -18,7 +18,10 @@ Notes about Navigation:
 Notes about Filtering:
 
 Notes about Motion Control:
-
+To go from Thymio speed to mm/s, the conversion factor = 0.41666666666666663
+The speed variance in mm^2/s^2 = 79.04287646849414
+The speed state variance in mm^2/s^2 = 39.52
+The speed measurement variance in mm^2/s^2 = 39.52
 
 
 
@@ -26,3 +29,20 @@ Notes about Motion Control:
 Personnal Reminders and notes
 [Julien] I took lines X to Y of file vision.py from this source : blablaa.com
 [Julien] I like trains
+
+
+
+GIT :
+To change branch (for example go to branch aruco_zhuoran)
+  git checkout aruco_zhuoran
+To get all the updates on the CLOUD/REMOTE git folder onto your own LOCAL git folder (do this regularly)
+  git pull
+
+To add the changes you just did to a file (first save the file lol):
+     git add name_of_file.py
+Then you can say to git "I'm sure I want to keep the changes on my own LOCAL GIT FOLDER" and add little messsage to remind yourself of what the changes were
+    git commit -m "hello, this is a comment, I can write anything here"
+Then when you want the others of the group to be able to see your changes, you can put them on the CLOUD/REMOTE git folder with
+    git push
+
+    
