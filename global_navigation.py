@@ -13,7 +13,7 @@ import time
 class GlobalNavigation:
 
  def __init__(self):
-  self.margin = 30
+  self.margin = 35
             
 
  def getObstacles(self, start, goal, obstacles):
@@ -127,11 +127,14 @@ class GlobalNavigation:
          path_y = [point[1] for point in path]
          ax.plot(path_x, path_y, 'b-', label="Path")
 
+     plt.gca().invert_yaxis()
+
      ax.set_xlabel('X')
      ax.set_ylabel('Y')
      ax.set_title('Dijkstra Path Planning')
      ax.legend()
-
+     
+        
      plt.show()
 
 # Test function for the GlobalNavigation class
