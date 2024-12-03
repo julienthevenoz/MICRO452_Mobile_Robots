@@ -13,7 +13,7 @@ import time
 class GlobalNavigation:
 
  def __init__(self):
-  self.margin = 35
+  self.margin = 40
             
 
  def getObstacles(self, start, goal, obstacles):

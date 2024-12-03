@@ -116,9 +116,9 @@ class MotionControl:
     # omega = max(-self.max_omega, min(omega, self.max_omega))
     if(self.distance_to_goal > 500):
       v = 250 * self.wheel_radis
-    if(self.distance_to_goal < 75):
-      v = 100 * self.wheel_radis
-    if(self.distance_to_goal < 10):
+    if(self.distance_to_goal < 50):
+      v = 150 * self.wheel_radis
+    if(self.distance_to_goal < 5):
       v_L = int((self.L * omega / 2) / self.wheel_radis)
       v_R = int((self.L * omega / 2) / self.wheel_radis)
       self.set_motor_speed(v_L, v_R)

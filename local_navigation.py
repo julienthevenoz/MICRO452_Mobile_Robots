@@ -22,7 +22,7 @@ class localNavigation():
           state = 1
     return state
     
-  def reactive_control(prox_horizontal, y):
+  def reactive_control(self, prox_horizontal, y):
     w_l = [40,  20, -20, -20, -40,  30, -10, 8, 0]
     w_r = [-40, -20, -20,  20,  40, -10, 30, 0, 8]
 
