@@ -122,7 +122,7 @@ class Analysis:
         obstacles = np.uint8(mask * 255)
 
         # 5. Process connected components
-        COUNT = 2000  # Minimum size threshold for components
+        COUNT = 3000  # Minimum size threshold for components
         num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(obstacles, connectivity=8)
         filtered_mask = np.zeros_like(obstacles)
 
