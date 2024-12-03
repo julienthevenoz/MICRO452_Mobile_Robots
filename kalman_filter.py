@@ -7,54 +7,63 @@ class KalmanFilter:
     the defined input[vl, vr]
     '''
     def __init__(self):
-        "Variance of the state measurement"
-        self.Q = np.array([[0, 0, 0],
-                           [0, 0, 0],
-                           [0, 0, 0]])
-        "Variance of the control input"
-        self.R = np.array([[1000, 0],
-                           [0, 1000]])
+        # measurement noise
+        self.R = np.array([[0.01, 0, 0],
+                           [0, 0.01, 0],
+                           [0, 0, 0.01]])
 
-        "Distance between two wheels(m)"
-        self.L = 0.095
+        self.R_crash = np.array([[1000, 0, 0],
+                                 [0, 1000, 0],
+                                 [0, 0, 1000]])
+
+        self.R_normal = np.array([[0.01, 0, 0],
+                           [0, 0.01, 0],
+                           [0, 0, 0.01]])
+        # state noise
+        self.Q = np.array([[5, 0, 0],
+                           [0, 5, 0],
+                           [0, 0, 0.5]])
+
+        "Dis‘tance between two wheels(mm)"
+        self.L = 95
+
+        self.A = np.array([[1, 0, 0],
+                           [0, 1, 0],
+                           [0, 0, 1]])
+
+        self.H = np.array([[1, 0, 0],
+                           [0, 1, 0],
+                           [0, 0, 1]])
+
+        self.kal_state = None
+        self.kal_variance = None
 
 
-    def get_A_linear(self, theta, v, omega):
-        A_linear = np.array([
-            [1, 0, -v *np.sin(theta + omega)],
-            [0, 1, v * np.cos(theta + omega)],
-            [0, 0, 1]
-        ])
-        return A_linear
+    def estimate(self, vl, vr, measurement):
+        measurement = np.array(measurement).reshape(3, 1)
+        u = np.array([[vl], [vr]])
+        A = self.A
+        B = np.array([[np.cos(self.kal_state[2]) / 2, np.cos(self.kal_state[2]) / 2],
+                      [np.sin(self.kal_state[2]) / 2, np.sin(self.kal_state[2]) / 2],
+                      [1 / (2 * self.L), - 1 / (2 * self.L) ]])
+        est_state = np.matmul(A, self.kal_state) + np.matmul(B, u)
+        est_variance = np.matmul(A, np.matmul(self.kal_variance , A.T)) + self.Q
+        yk = measurement - np.matmul(self.H, est_state)
+        S = np.matmul(self.H, np.matmul(est_variance, self.H.T)) + self.R
+        K = np.matmul(est_variance, np.matmul(self.H.T, np.linalg.inv(S)))
+        self.kal_state = est_state + np.matmul(K, yk)
+        self.kal_variance = np.matmul(np.eye(3) - np.matmul(K, self.H), est_variance)
+        return self.kal_state, self.kal_variance
 
-    def get_B_linear(self, theta, v, omega):
-        dx_dvl = 0.5 * np.cos(theta + omega) - v * np.sin(theta + omega) / (2 * self.L)
-        dx_dvr = 0.5 * np.cos(theta + omega) + v * np.sin(theta + omega) / (2 * self.L)
-        dy_dvl = 0.5 * np.sin(theta + omega) + v * np.cos(theta + omega) / (2 * self.L)
-        dy_dvr = 0.5 * np.sin(theta + omega) - v * np.cos(theta + omega) / (2 * self.L)
-        dtheta_dvl = 1 / (2 * self.L)
-        dtheta_dvr = -1 / (2 * self.L)
-        B_linear = np.array([
-            [dx_dvl, dx_dvr],
-            [dy_dvl, dy_dvr],
-            [dtheta_dvl, dtheta_dvr]
-        ])
-        return B_linear
+    def check_camera(self, thymio):
+        if not thymio:
+            self.R = self.R_crash
+            return [0, 0, 0]
+        else:
+            self.R = self.R_normal
+            return thymio
 
-    def estimate(self, pre_state, pre_variance, vl, vr, measurenment):
-        v = (vl + vr) / 2
-        omega = (vl + vr) / (2 * self.L)
-        "state update"
-        est_state = np.array([pre_state[0] + v * np.cos(pre_state[2] + omega),
-                              pre_state[1] + v * np.sin(pre_state[2] + omega),
-                              (pre_state[2] + omega) % (2*np.pi)])
-        A = self.get_A_linear(pre_state[2], v, omega)
-        B = self.get_B_linear(pre_state[2], v, omega)
-        est_variance = np.matmul(A, np.matmul(pre_variance, A.T)) + np.matmul(B, np.matmul(self.R, B.T))
-        K = np.matmul(est_variance, np.linalg.inv(est_variance + self.Q))
-        kal_state = est_state + np.matmul(K, (measurenment - est_state))
-        kal_variance = np.matmul(np.eye(3) - K, est_variance)
-        return kal_state, kal_variance
+
 
 def test_kalman_filter():
         # Initialize the Kalman Filter
@@ -105,7 +114,7 @@ def test_kalman_filter():
             vr_dis = vr_get * dt
 
             # Kalman Filter estimation
-            kal_state, kal_variance = kf.estimate(pre_state, pre_variance, vl_dis, vr_dis, noisy_measurement)
+            kal_state, kal_variance = kf.estimate(vl_dis, vr_dis, noisy_measurement)
 
             # Store results
             true_states.append(true_state)

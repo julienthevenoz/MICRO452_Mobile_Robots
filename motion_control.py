@@ -1,6 +1,7 @@
 import numpy as np
 from robot_api import Thymio
 from tdmclient import ClientAsync
+import time
 class MotionControl:
   '''
   Control method: Proportional Control for Differential Drive Robots
@@ -31,6 +32,9 @@ class MotionControl:
     # parameters related to global navigation
     self.goal_range = 10
 
+    self.start_time = None
+    self.end_time = None
+
   def is_obstacle(self, prox_horizontal):
     mark = 0
     for i in range(5):
@@ -59,28 +63,9 @@ class MotionControl:
       speed = self.get_motor_speed()
       prox_horizontal = self.read_prox_sensors()
 
-  def move_to_next(self, current_pos, goal_pos, current_angle):
-    '''
-      caculate the speed based on current position and goal position
-      Input: current_pos, goal_pos, current_angle
-      Output: desired velocity and angular velocity of our robot
-    '''
-    delta = np.subtract(goal_pos, current_pos)
-    dis = np.sqrt(np.sum(np.square(delta)))
-    # need to check if this work
-    theta = np.arctan2(delta[1], delta[0])
-    angle_error = current_angle - theta
-    v = self.Ka * dis
-    omega = self.Kb * angle_error
-    return v, omega
-
   def path_tracking(self, robot_state, goal_point):
-    try:
-      if robot_state is None or len(robot_state) == 0 or goal_point is None or len(goal_point) == 0:
-        return False
-    except:
-      print("there was an error in path_tracking, printing rob state and goal point")
-      print(robot_state, goal_point)
+    if self.start_time is None:
+      self.start_time = time.time()
     x, y, theta = robot_state
     x_goal, y_goal = goal_point
     delta_x = x_goal - x
@@ -99,6 +84,15 @@ class MotionControl:
     omega = max(-self.max_omega, min(omega, self.max_omega))
     self.set_motor_speed(v+omega, v-omega)
     return False
+
+  def get_displacement(self):
+    motor_speed = self.get_motor_speed()
+    self.end_time = time.time()
+    time_step = self.end_time - self.start_time
+    vl_displacement = motor_speed[0] * 0.417 * time_step * 0.563  # 600/1065
+    vr_displacement = motor_speed[1] * 0.417 * time_step * 0.446  # 300/673
+    self.start_time = time.time()
+    return vl_displacement, vr_displacement
 
   def get_motor_speed(self):
     motor_speed = self.thymio.read_motors_speed()
