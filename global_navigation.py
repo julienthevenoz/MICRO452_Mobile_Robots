@@ -1,9 +1,3 @@
-class global_navigation:
-  '''
-  Could use some existing libraries: pyvisgraph
-  Input: start_point, end_point, obstacles(get from visual module)
-  Output: shortest path
-  '''
 import cv2
 import numpy as np
 from shapely.geometry import LineString, Polygon
@@ -13,65 +7,76 @@ import matplotlib.pyplot as plt
 import heapq
 import geopandas as gpd
 from geopandas import GeoSeries
+import cv2
+import time
+
+class GlobalNavigation:
+
+ def __init__(self):
+  self.margin = 25
+  self.last_thymio = None
+  self.last_goal = None
+            
+
+ def getObstacles(self, start, goal, obstacles):
+  obstacle_polygons = [Polygon(vertices) for vertices in obstacles]
+  buffered_obstacles = [obstacle.buffer(self.margin, join_style = "mitre") for obstacle in obstacle_polygons]
+  all_vertices = [tuple(start), tuple(goal)]
+  for buffered_obstacle in buffered_obstacles:
+            for coord in buffered_obstacle.exterior.coords:
+                all_vertices.append(tuple(coord))
+  return obstacle_polygons, all_vertices
 
 
+ # Function to check if an edge is valid, doesn't cross obstacles
+ def is_edge_valid(self, p1, p2, obstacles):
+  edge = LineString([p1, p2])
+  for obstacle in obstacles:
+   if edge.crosses(obstacle) or edge.within(obstacle):
+    return False
+  return True
 
-image_path = r"C:\Users\User\OneDrive\Desktop\EPFL\MA1\Basics of Mobile Robotics\Project\Images\Paint_map.png"  # Update this path if needed
-image_cv = cv2.imread(image_path)
+ def visibilityGraph(self, start, goal, obtacles):
+  obstacle_polygons, all_vertices = self.getObstacles(start, goal, obtacles)
+  visibility_graph = {v: [] for v in all_vertices}
+  for i, v1 in enumerate(all_vertices):
+   for j, v2 in enumerate(all_vertices):
+    if i != j and self.is_edge_valid(v1, v2, obstacle_polygons):
+     visibility_graph[v1].append(v2)
+  return visibility_graph
 
-gray = cv2.cvtColor(image_cv, cv2.COLOR_BGR2GRAY)
-_, thresh = cv2.threshold(gray, 50, 255, cv2.THRESH_BINARY_INV)
-
-margin = 20
-
-
-# Detect contours and approximate polygon vertices
-contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-vertices_list = []
-for contour in contours:
-    epsilon = 0.01 * cv2.arcLength(contour, True)
-    approx = cv2.approxPolyDP(contour, epsilon, True)
-    vertices_list.append(approx.reshape(-1, 2))
-
-
-start_point = (200, 600)  
-goal_point = (950, 550)  
-
-# Create obstacles as polygons
-obstacle_polygons = [Polygon(vertices) for vertices in vertices_list]
-
-g = (GeoSeries(obstacle_polygons)).buffer(margin, join_style = 2)
-
-# Combine all vertices
-all_vertices = [start_point, goal_point] + [tuple(v) for vertices in vertices_list for v in vertices]
-
-m = 2
-
-for obstacle in g:
-   j = 0
-   while j < len(obstacle.exterior.coords) - 1:
-        all_vertices[m] = obstacle.exterior.coords[j]
-        j = j + 1
-        m = m + 1
-
-
-# Function to check if an edge is valid, doesn't cross obstacles
-def is_edge_valid(p1, p2, obstacles):
-    edge = LineString([p1, p2])
-    for obstacle in obstacles:
-        if edge.crosses(obstacle) or edge.within(obstacle):
-            return False
-    return True
-
-# Construct the visibility graph
-visibility_graph = {v: [] for v in all_vertices}
-for i, v1 in enumerate(all_vertices):
-    for j, v2 in enumerate(all_vertices):
-        if i != j and is_edge_valid(v1, v2, obstacle_polygons):
-            visibility_graph[v1].append(v2)
 
 # Implement Dijkstra's Algorithm
-def dijkstra(graph, start, goal):
+ def dijkstra(self, thymio, goal, obstacles):
+
+    #if we don't detect goal or thymio, use last saved position
+    if thymio == [] or thymio is None:
+        print(0)
+        if self.last_thymio is None: #was never found, still initialized as None
+           return None, 0, None
+        thymio = self.last_thymio
+    else:
+         #if we have new thymio position, update it
+       self.last_thymio = thymio
+
+    if goal == [] or goal is None:
+       if self.last_goal is None:  #was never found, still initialized as None
+          return None, 0, None 
+       goal = self.last_goal
+    else:
+       self.last_goal = goal
+       
+       
+    try :
+        thymio_x, thymio_y, theta = thymio
+    except : 
+       print(type(thymio), thymio)
+       thymio_x, thymio_y, theta = thymio
+    start = (thymio_x, thymio_y)
+    goal = tuple(goal)
+    obstacles = [tuple(obstacle) for obstacle in obstacles]
+
+    graph = self.visibilityGraph(start, goal, obstacles)
     queue = [(0, start)]  # (cost, current_node)
     distances = {node: float("inf") for node in graph}
     previous_nodes = {node: None for node in graph}
@@ -80,13 +85,15 @@ def dijkstra(graph, start, goal):
     while queue:
         current_distance, current_node = heapq.heappop(queue)
 
+        # If we've reached the goal, reconstruct the path
         if current_node == goal:
             path = []
             while current_node:
-                path.append(current_node)
+                path.append(tuple(float(coord) for coord in current_node))
                 current_node = previous_nodes[current_node]
-            return path[::-1], current_distance
+            return path[::-1], current_distance, graph  # Return reversed path and distance
 
+        # Check all neighbors
         for neighbor in graph[current_node]:
             edge_distance = np.linalg.norm(np.array(current_node) - np.array(neighbor))
             new_distance = current_distance + edge_distance
@@ -96,42 +103,93 @@ def dijkstra(graph, start, goal):
                 previous_nodes[neighbor] = current_node
                 heapq.heappush(queue, (new_distance, neighbor))
 
-    return None, float("inf")
+    return None, float("inf"), graph  # Return None if no path is found
 
+# Plot the path using cv2
+ def plot_path_cv2(self, path, obstacles, img_size=(600, 300)):
+     img = np.ones((img_size[1], img_size[0], 3), dtype=np.uint8) * 255  # White background
 
-shortest_path, path_distance = dijkstra(visibility_graph, start_point, goal_point)
+     for obstacle in obstacles:
+         pts = np.array(obstacle, dtype=np.int32)
+         cv2.fillPoly(img, [pts], color=(150, 150, 150))  # Gray color for obstacles
 
+     if path:
+         for i in range(len(path) - 1):
+             start = tuple(map(int, path[i]))
+             end = tuple(map(int, path[i + 1]))
+             cv2.line(img, start, end, color=(255, 0, 0), thickness=2)  # Blue line for path
 
-plt.figure(figsize=(10, 10))
-plt.imshow(cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB))
-plt.title("Visibility Graph and Shortest Path")
+     if path:
+         start = tuple(map(int, path[0]))
+         goal = tuple(map(int, path[-1]))
+         cv2.circle(img, start, radius=5, color=(0, 255, 0), thickness=-1)  # Green circle for start
+         cv2.circle(img, goal, radius=5, color=(0, 0, 255), thickness=-1)  # Red circle for goal
 
+     cv2.imshow("Path Planning", img)
+     cv2.waitKey(0)
+     cv2.destroyAllWindows()
 
-for vertices in vertices_list:
-    for (x, y) in vertices:
-        plt.scatter(x, y, c="green", s=20)  # Vertices
+# Plot the path using matplotlib
+ def plot_path(self, path, obstacles):
 
-for x,y in all_vertices:
-   
-        plt.scatter(x, y, c="black", s=40)
+     # Visualize the result
+     fig, ax = plt.subplots()
 
-for v1, neighbors in visibility_graph.items():
-    for v2 in neighbors:
-        plt.plot([v1[0], v2[0]], [v1[1], v2[1]], c="gray", linewidth=0.5)
+     # Plot obstacles
+     for obstacle in obstacles:
+         poly = Polygon(obstacle)
+         x, y = poly.exterior.xy
+         ax.fill(x, y, color='gray', alpha=0.5)
 
-if shortest_path:
-    for i in range(len(shortest_path) - 1):
-        x1, y1 = shortest_path[i]
-        x2, y2 = shortest_path[i + 1]
-        plt.plot([x1, x2], [y1, y2], c="red", linewidth=2)
+     # # Plot the start and goal points
+     # ax.plot(start[0], start[1], 'go', label="Start")
+     # ax.plot(goal[0], goal[1], 'ro', label="Goal")
 
-plt.scatter(start_point[0], start_point[1], c="red", s=100, label="Start (Red)")
-plt.scatter(goal_point[0], goal_point[1], c="blue", s=100, label="Goal (Blue)")
+     # Plot the path if one is found
+     if path:
+         path_x = [point[0] for point in path]
+         path_y = [point[1] for point in path]
+         ax.plot(path_x, path_y, 'b-', label="Path")
 
-plt.legend()
-plt.axis("on")
-plt.show()
+     ax.set_xlabel('X')
+     ax.set_ylabel('Y')
+     ax.set_title('Dijkstra Path Planning')
+     ax.legend()
 
-print("Shortest Path:", shortest_path)
-print("Path Distance:", path_distance)
+     plt.show()
 
+# Test function for the GlobalNavigation class
+if __name__ == "__main__":
+    # Define some obstacles
+    # obstacles = [
+    #     [(2, 2), (4, 2), (4, 4), (2, 4)],  # Square obstacle
+    #     [(6, 6), (8, 6), (8, 8), (6, 8)]  # Another square obstacle
+    # ]
+    # obstacles = []
+    #
+    # # Start and goal points
+    # start = (0, 0)
+    # goal = (10, 10)
+    thymio = [201, 143, 1.055]
+    goal = [406.53833, 69.10376]
+    obstacles = [[[464, 321], [366, 321], [404, 238]],
+                 [[200, 150], [250, 40], [270, 180], [230, 200], [200, 200]],
+                 [[500, 50], [550, 50], [570, 90], [520, 100], [500, 80]],
+                 [[275, 23], [325, 200], [340, 240], [290, 250], [275, 230]]]
+
+    # Create an instance of the GlobalNavigation class
+    navigation = GlobalNavigation()
+    start_time = time.time()
+    # Run Dijkstra's algorithm to find the shortest path
+    path, cost, graph = navigation.dijkstra(thymio, goal, obstacles)
+    end_time = time.time()
+    # Print results
+    if path:
+        print("Path found:", path)
+        print("Total cost:", cost)
+    else:
+        print("No path found")
+
+    navigation.plot_path_cv2(path, obstacles)
+    execution_time = end_time - start_time
+    print("Execution time:", execution_time)
