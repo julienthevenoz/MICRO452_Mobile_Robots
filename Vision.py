@@ -369,7 +369,7 @@ class Analysis:
 
         #print(f"{len(corners)} detected corners, {in_memory} corners stored")
 
-    def draw_path_on_image(self, path, past_positions=[]):
+    def draw_path_on_image(self, path, past_kalman_estimates=[]):
         """
         Dessine le chemin calculé par Dijkstra sur l'image donnée.
         Draw the dijsktra path in green on the image, and all past positions (path already travelled) as red dots.
@@ -378,6 +378,8 @@ class Analysis:
         :param path: Liste des points [x, y] représentant le chemin
         :return: Image avec le chemin dessiné
         """
+        print("drawing path", path, past_kalman_estimates
+        )
         img_with_path = self.top_view.copy()
         for i in range(len(path) - 1):
             start = tuple(map(int, path[i]))
@@ -385,10 +387,15 @@ class Analysis:
             cv2.line(img_with_path, start, end, (0, 255, 0), 2)  # Vert pour le chemin
         
         #draw red points for points already travelled
-        if past_positions:
-            for position in past_positions:
-                #if position.any() != [-1,-1]:
+        if past_kalman_estimates:
+            for position in past_kalman_estimates:
+                # try:
+                    # if position.any() != [-1,1]:
                 cv2.circle(img_with_path, np.array(position,dtype="int32"), 2, (0,0,255), -1)
+                # except:
+                #     print(type(position), position)
+                #     if position.any() != [-1,1]:
+                #         pass
         return img_with_path
 
     def detect_thymio_pose(self,thymio_marker):
@@ -488,7 +495,7 @@ class CameraFeed(threading.Thread):
         self.goal_position = []
         self.obstacle_corners = []
         self.show_which = [1,1,1,1,1,1]
-        self.past_positions = []
+        self.past_kalman_estimates= []
 
     # def get_thymio_goal_and_obstacles(self):
     #     '''Returns [x,y,theta] of thymio, [x,y] of goal and list of obstacle 
@@ -514,8 +521,10 @@ class CameraFeed(threading.Thread):
                 dijkstra_path_view = top_view
 
                 if self.vision_module.path :
-                    dijkstra_path_view = self.vision_module.draw_path_on_image(self.vision_module.path, self.past_positions)
-
+                    dijkstra_path_view = self.vision_module.draw_path_on_image(self.vision_module.path, self.past_kalman_estimates
+                    )
+                else:
+                    print("No path")
                 #output variables :>
                 # - [x,y,theta] of thymio - [x,y] of goal   -list of obstacle corners (list of list ?)
                 #if they have not been detected, will return empty list []
@@ -555,11 +564,7 @@ class CameraFeed(threading.Thread):
                 self.robot_pose = robot_pose
                 self.goal_position = goal_position
 
-                # #update past_positions:
-                # if robot_pose:
-                #     self.past_positions.append(robot_pose[:2])
-                # else:
-                #     self.past_positions.append([-1,-1])
+    
                 
                 videofeeds_list = [frame, filtered_mask, img_with_polygons, annotated_img, top_view, dijkstra_path_view]
                 titles_list = ["Original", "filtered_mask", "Processed_with_polygones", "Highlighting corners", "thymio Oops, baby", "dijkstra_path_view"]
@@ -597,7 +602,7 @@ class Vision():
         # self.stop_event = threading.Event()
 
     def begin(self, show_which=[1,1,1,1,1,1]):
-        if not self.analysis.initialize_camera(cam_port=4):
+        if not self.analysis.initialize_camera(cam_port=0):
             print("Erreur : Impossible d'initialiser la caméra.")
             return
         self.camera_feed.show_which = show_which

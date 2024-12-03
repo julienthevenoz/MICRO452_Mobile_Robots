@@ -75,9 +75,12 @@ class MotionControl:
     return v, omega
 
   def path_tracking(self, robot_state, goal_point):
-    print('hi')
-    if not robot_state or not goal_point:
-      return False
+    try:
+      if robot_state is None or len(robot_state) == 0 or goal_point is None or len(goal_point) == 0:
+        return False
+    except:
+      print("there was an error in path_tracking, printing rob state and goal point")
+      print(robot_state, goal_point)
     x, y, theta = robot_state
     x_goal, y_goal = goal_point
     delta_x = x_goal - x
