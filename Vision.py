@@ -541,7 +541,7 @@ class CameraFeed(threading.Thread):
                     end_y = int(robot_pose[1] + arrow_length * np.sin(robot_pose[2]))
                     top_view = cv2.arrowedLine(top_view.copy(), np.array(robot_pose[:2],dtype='int32'), (end_x, end_y), (0, 0, 255), 5)
                 else:
-                    print("Thymio not detected")
+                     print("Thymio not detected")
            
                 if goal_marker is not None:
                     goal_position = self.analysis.detect_goal_position(goal_marker)
@@ -597,7 +597,7 @@ class Vision():
         # self.stop_event = threading.Event()
 
     def begin(self, show_which=[1,1,1,1,1,1]):
-        if not self.analysis.initialize_camera(cam_port=0):
+        if not self.analysis.initialize_camera(cam_port=4):
             print("Erreur : Impossible d'initialiser la caméra.")
             return
         self.camera_feed.show_which = show_which

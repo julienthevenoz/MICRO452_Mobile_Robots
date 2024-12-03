@@ -14,6 +14,9 @@ class GlobalNavigation:
 
  def __init__(self):
   self.margin = 40
+  self.last_thymio = None
+  self.last_goal = None
+            
             
 
  def getObstacles(self, start, goal, obstacles):
