@@ -243,7 +243,12 @@ class Analysis:
         '''Returns the center point of four coordinates (must be given
         in TL,TR,BR,BL order) and its orientation as an array of int'''
         
-        tl,tr,br,bl = marker
+        try:
+            tl,tr,br,bl = marker
+        except:
+            print("THE FUCKING BUG ")
+            tl,tr,br,bl = marker
+
         
         #find orientation of the marker
         theta = np.arctan2((tr[1]-br[1]), (tr[0]-br[0]))
@@ -378,8 +383,6 @@ class Analysis:
         :param path: Liste des points [x, y] représentant le chemin
         :return: Image avec le chemin dessiné
         """
-        print("drawing path", path, past_kalman_estimates
-        )
         img_with_path = self.top_view.copy()
         for i in range(len(path) - 1):
             start = tuple(map(int, path[i]))
@@ -602,7 +605,7 @@ class Vision():
         # self.stop_event = threading.Event()
 
     def begin(self, show_which=[1,1,1,1,1,1]):
-        if not self.analysis.initialize_camera(cam_port=0):
+        if not self.analysis.initialize_camera(cam_port=4):
             print("Erreur : Impossible d'initialiser la caméra.")
             return
         self.camera_feed.show_which = show_which
