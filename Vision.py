@@ -95,12 +95,6 @@ class Analysis:
                 crossing_index = i
                 break
 
-        # # Find the threshold
-        # # if crossing_index != -1:
-        # #     print(f"The highest index where the signal crosses {grad_threshold} is {crossing_index}.")
-        # # else:
-        # #     print(f"No crossing found before index {highest}.")
-
         treshold = crossing_index
 
         # 4. Create a binary mask based on the threshold
@@ -418,10 +412,6 @@ class Analysis:
             #print("(get_2_markers) Thymio and Goal markers not detected")
             return None, None
         else:
-            # # Verify that we have at least the two desired markers
-            # if not (len(ids) >= 2):
-            #     print(f"(get_2_markers) Detected {len(ids)} markers instead of at least 2.")
-            #     #return markers.squeeze(), ids.squeeze()
             if not(4 in ids):
                 # print("(get_2_markers) Thymio not detected")
                 return None, markers
