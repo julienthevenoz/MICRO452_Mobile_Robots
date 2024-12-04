@@ -13,7 +13,7 @@ import time
 class GlobalNavigation:
 
  def __init__(self):
-  self.margin = 25
+  self.margin = 40
             
 
  def getObstacles(self, start, goal, obstacles):
@@ -24,7 +24,7 @@ class GlobalNavigation:
   for buffered_obstacle in buffered_obstacles:
             for coord in buffered_obstacle.exterior.coords:
                 all_vertices.append(tuple(coord))
-  return obstacle_polygons, all_vertices
+  return buffered_obstacles, all_vertices
 
 
  # Function to check if an edge is valid, doesn't cross obstacles
