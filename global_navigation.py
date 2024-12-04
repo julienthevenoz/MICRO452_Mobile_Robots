@@ -18,7 +18,8 @@ class GlobalNavigation:
 
  def getObstacles(self, start, goal, obstacles):
   obstacle_polygons = [Polygon(vertices) for vertices in obstacles]
-  buffered_obstacles = [obstacle.buffer(self.margin, join_style = "mitre") for obstacle in obstacle_polygons]
+  obstacle_polygons = GeoSeries(obstacle_polygons)
+  buffered_obstacles = obstacle_polygons.buffer(self.margin, join_style = 2) 
   all_vertices = [tuple(start), tuple(goal)]
   for buffered_obstacle in buffered_obstacles:
             for coord in buffered_obstacle.exterior.coords:
