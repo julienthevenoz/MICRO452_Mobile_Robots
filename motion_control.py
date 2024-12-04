@@ -32,6 +32,9 @@ class MotionControl:
     self.start_time = None
     self.end_time = None
 
+    self.max_velocity = 1000
+    self.max_omega = 40
+
   def is_obstacle(self, prox_horizontal):
     mark = 0
     for i in range(5):
@@ -61,8 +64,8 @@ class MotionControl:
       prox_horizontal = self.read_prox_sensors()
 
   def path_tracking(self, robot_state, goal_point):
-    if not robot_state or not goal_point:
-      return False
+    if self.start_time is None:
+      self.start_time = time.time()
     x, y, theta = robot_state
     
     theta = -theta
