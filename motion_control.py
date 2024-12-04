@@ -117,6 +117,16 @@ class MotionControl:
     self.start_time = time.time()
     return vl_displacement, vr_displacement
 
+  def is_kidnapping(self, kal_state, pre_state):
+    x, y, theta = kal_state
+    x_pre, y_pre, theta_pre = pre_state
+    delta_x = x - x_pre
+    delta_y = y - y_pre
+    distance = np.sqrt(delta_x ** 2 + delta_y ** 2)
+    if distance > 50:
+      return True
+    return False
+
   def get_motor_speed(self):
     motor_speed = self.thymio.read_motors_speed()
     return motor_speed

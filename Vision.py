@@ -85,8 +85,8 @@ class Analysis:
         hist = cv2.calcHist([lab_img[:, :, 0]], [0], None, [180], [0, 180])  # 180 bins for L in the range [0, 180]
         signal = np.gradient(medfilt(hist.flatten(), 15))  # Median filtering to smooth the signal
 
-        grad_threshold = -10
-        highest = 125
+        grad_threshold = -15
+        highest = 110
 
         # 3. Search for the threshold in the signal
         crossing_index = -1
