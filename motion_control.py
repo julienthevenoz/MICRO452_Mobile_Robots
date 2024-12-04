@@ -35,33 +35,33 @@ class MotionControl:
     self.max_velocity = 1000
     self.max_omega = 40
 
-  def is_obstacle(self, prox_horizontal):
+  def is_obstacle(self):
     mark = 0
+    prox_horizontal = self.read_prox_sensors()
     for i in range(5):
       if prox_horizontal[i] > self.threshold_high:
-        return True
+        return 0
       if prox_horizontal[i] < self.threshold_low:
         mark = mark + 1
     if mark == 5:
-      return False
+      return 1
     else:
-      return True
+      return 0
 
   def obstacle_avoidance(self):
     speed = self.get_motor_speed()
     prox_horizontal = self.read_prox_sensors()
-    while self.is_obstacle(prox_horizontal):
-      delta = 0
-      for i in range(5):
-        delta += prox_horizontal[i] * self.obstSpeedGain[i]
-      delta = max(-self.max_omega, min(delta, self.max_omega))
-      speed[0] = speed[0] + delta
-      speed[1] = speed[1] - delta
-      speed[0] = int(speed[0])
-      speed[1] = int(speed[1])
-      self.thymio.set_motor_speed(speed[0], speed[1])
-      speed = self.get_motor_speed()
-      prox_horizontal = self.read_prox_sensors()
+    delta = 0
+    for i in range(5):
+      delta += prox_horizontal[i] * self.obstSpeedGain[i]
+    delta = max(-self.max_omega, min(delta, self.max_omega))
+    speed[0] = speed[0] + delta
+    speed[1] = speed[1] - delta
+    speed[0] = int(speed[0])
+    speed[1] = int(speed[1])
+    self.thymio.set_motor_speed(speed[0], speed[1])
+    speed = self.get_motor_speed()
+    prox_horizontal = self.read_prox_sensors()
 
   def path_tracking(self, robot_state, goal_point):
     if self.start_time is None:
