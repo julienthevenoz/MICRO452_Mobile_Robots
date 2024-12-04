@@ -12,10 +12,6 @@ class MotionControl:
     self.Kb = 0
     self.Kp = 20
 
-    # speed limit
-    self.max_velocity = 5000
-    self.max_omega = 100
-
     # units: mm
     self.wheel_radis = 20
     self.L = 95
@@ -33,49 +29,39 @@ class MotionControl:
     # parameters related to global navigation
     self.goal_range = 30
 
-  # def is_obstacle(self, prox_horizontal):
-    
-  #   mark = 0
-  #   for i in range(5):
-  #     if prox_horizontal[i] > self.threshold_high:
-  #       return 1
-  #     if prox_horizontal[i] < self.threshold_low:
-  #       mark = mark + 1
-  #   if mark == 5:
-  #     return 0
-  #   else:
-  #     return 1
+    self.start_time = None
+    self.end_time = None
 
-  # def obstacle_avoidance(self):
-  #   speed = self.get_motor_speed()
-  #   prox_horizontal = self.read_prox_sensors()
-  #   while self.is_obstacle(prox_horizontal):
-  #     delta = 0
-  #     for i in range(5):
-  #       delta += prox_horizontal[i] * self.obstSpeedGain[i]
-  #     delta = max(-self.max_omega, min(delta, self.max_omega))
-  #     speed[0] = speed[0] + delta
-  #     speed[1] = speed[1] - delta
-  #     speed[0] = int(speed[0])
-  #     speed[1] = int(speed[1])
-  #     self.thymio.set_motor_speed(speed[0], speed[1])
-  #     speed = self.get_motor_speed()
-  #     prox_horizontal = self.read_prox_sensors()
+    self.max_velocity = 1000
+    self.max_omega = 40
 
-  # def move_to_next(self, current_pos, goal_pos, current_angle):
-  #   '''
-  #     caculate the speed based on current position and goal position
-  #     Input: current_pos, goal_pos, current_angle
-  #     Output: desired velocity and angular velocity of our robot
-  #   '''
-  #   delta = np.subtract(goal_pos, current_pos)
-  #   dis = np.sqrt(np.sum(np.square(delta)))
-  #   # need to check if this work
-  #   theta = np.arctan2(delta[1], delta[0])
-  #   angle_error = current_angle - theta
-  #   v = self.Ka * dis
-  #   omega = self.Kb * angle_error
-  #   return v, omega
+  def is_obstacle(self):
+    mark = 0
+    prox_horizontal = self.read_prox_sensors()
+    for i in range(5):
+      if prox_horizontal[i] > self.threshold_high:
+        return 0
+      if prox_horizontal[i] < self.threshold_low:
+        mark = mark + 1
+    if mark == 5:
+      return 1
+    else:
+      return 0
+
+  def obstacle_avoidance(self):
+    speed = self.get_motor_speed()
+    prox_horizontal = self.read_prox_sensors()
+    delta = 0
+    for i in range(5):
+      delta += prox_horizontal[i] * self.obstSpeedGain[i]
+    delta = max(-self.max_omega, min(delta, self.max_omega))
+    speed[0] = speed[0] + delta
+    speed[1] = speed[1] - delta
+    speed[0] = int(speed[0])
+    speed[1] = int(speed[1])
+    self.thymio.set_motor_speed(speed[0], speed[1])
+    speed = self.get_motor_speed()
+    prox_horizontal = self.read_prox_sensors()
 
   def path_tracking(self, robot_state, goal_point):
     #print('hi')
@@ -91,9 +77,6 @@ class MotionControl:
     distance_to_goal = np.sqrt(delta_x ** 2 + delta_y ** 2)
     self.distance_to_goal = distance_to_goal
     
-    # if distance_to_goal < self.goal_range:
-    #   #print('reached goal')
-    #   return True
     angle_to_goal = np.arctan2(-delta_y, delta_x)
     
     alpha = - theta + angle_to_goal
@@ -104,49 +87,26 @@ class MotionControl:
     elif (alpha < -np.pi):
       alpha = alpha + 2 * np.pi
 
-    #print(angle_to_goal)
-    print("alpha = ", alpha)
-    #print(beta)
-    # angle_error = angle_to_goal - theta
-    # v = self.Ka * self.distance_to_goal * np.cos(math.degrees(angle_error))
-    # omega = self.Kb * math.degrees(angle_error) + self.Ka * (np.cos(math.degrees(angle_error)) * np.sin(math.degrees(angle_error)))
-
     v = self.Kp * self.distance_to_goal
-    #v = 1000
-    print ("vitesse lineaire de base ", v)
     omega = self.Ka * alpha + self.Kb * beta
-    #print ("omega = ", omega)
-    #print ("vitesse angulaire finale", v)
 
-    # v = max(-self.max_velocity, min(v, self.max_velocity))
-    # omega = max(-self.max_omega, min(omega, self.max_omega))
-    print("distance du but", self.distance_to_goal)
     if(self.distance_to_goal > 500):
       v = 250 * self.wheel_radis
-      #print ("motor speed loin ", v)
-    elif(self.distance_to_goal < 50):
+    if(self.distance_to_goal < 50):
       v = 100 * self.wheel_radis
-      #print ("motor speed proche", v)
-    
-    if(self.distance_to_goal < 10):
-      print ("je suis arrivé au but")
+    if(self.distance_to_goal < self.goal_range):
       v_L = int((self.L * omega / 2) / self.wheel_radis)
       v_R = int((self.L * omega / 2) / self.wheel_radis)
-      print ("V left = ", v_L, "V right = ", v_R,)
+
       self.set_motor_speed(v_L, v_R)
       return True
-    v_L =  int((v - (self.L * omega / 2)) / self.wheel_radis)
-    #print ("motor speed left ", v_L)
-    #print ("omga revisité = ", (self.L * omega / 2))
-    v_R = int((v + (self.L * omega / 2)) / self.wheel_radis)
-    #print ("motor speed right", v_L)
-
-    #forward_speed = self.__KAPPA_RHO * rho
-    #turning_velocity = -(self.__WHEEL_DISTANCE / 2) * (self.__KAPPA_ALPHA * alpha + self.__KAPPA_BETA * beta)
     
+    v_L =  int((v - (self.L * omega / 2)) / self.wheel_radis)
+    v_R = int((v + (self.L * omega / 2)) / self.wheel_radis)
+
     self.set_motor_speed(v_L, v_R)
-    #print(angle_to_goal,omega)
     return False
+
 
   def get_displacement(self):
     motor_speed = self.get_motor_speed()
