@@ -608,7 +608,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
-
+    img = cv2.imread("Photos/Tymio_islands_resised.jpg")
+    ana = Analysis()
+    ana.frame = img
+    ana.detect_obstacle_corners()
 
 
