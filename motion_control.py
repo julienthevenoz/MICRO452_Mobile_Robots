@@ -20,11 +20,11 @@ class MotionControl:
     self.thymio = thymio
 
     # parameters related to local navigation
-    # self.threshold_high = 1000
-    # self.threshold_low = 100
+    self.threshold_high = 1000
+    self.threshold_low = 100
 
     # weights when implementing the local obstacle avoidance
-    # self.obstSpeedGain = [0.3, 0.2, -0.1, -0.3, -0.4]
+    self.obstSpeedGain = [0.3, 0.2, -0.1, -0.3, -0.4]
 
     # parameters related to global navigation
     self.goal_range = 30
@@ -64,9 +64,8 @@ class MotionControl:
     prox_horizontal = self.read_prox_sensors()
 
   def path_tracking(self, robot_state, goal_point):
-    #print('hi')
-    if not robot_state or not goal_point:
-      return False
+    if self.start_time is None:
+      self.start_time = time.time()
     x, y, theta = robot_state
     
     theta = -theta
@@ -106,6 +105,7 @@ class MotionControl:
 
     self.set_motor_speed(v_L, v_R)
     return False
+
 
 
   def get_displacement(self):

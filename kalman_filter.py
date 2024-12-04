@@ -35,8 +35,11 @@ class KalmanFilter:
                            [0, 1, 0],
                            [0, 0, 1]])
 
+        self.kal_variance = np.array([[0.01, 0, 0],
+                                      [0, 0.01, 0],
+                                      [0, 0, 0.01]])
+
         self.kal_state = None
-        self.kal_variance = None
         self.S = None
         self.K = None
 
@@ -67,9 +70,12 @@ class KalmanFilter:
         return self.kal_state, self.kal_variance
 
     def check_camera(self, thymio):
+
+        #if thymio is None or [], it means the camera isn't detecting anything 
         if not thymio:
-            self.R = self.R_crash
-            return [0, 0, 0]
+            self.R = self.R_crash  #then we make R infinite so that the Kalman completely ignores the camera measurement
+            return [-1, -1, -1]    #and we return an impossible value 
+        #if not, keep R and thymio normal
         else:
             self.R = self.R_normal
             return thymio
