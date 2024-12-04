@@ -8,12 +8,9 @@ class MotionControl:
   '''
   def __init__(self, thymio):
     # important parameter to adjust
-    self.Ka = 30
-    self.Kb = 40
-
-    # speed limit
-    self.max_velocity = 1000
-    self.max_omega = 40
+    self.Ka = 50
+    self.Kb = 0
+    self.Kp = 20
 
     # units: mm
     self.wheel_radis = 20
@@ -64,26 +61,48 @@ class MotionControl:
       prox_horizontal = self.read_prox_sensors()
 
   def path_tracking(self, robot_state, goal_point):
-    if self.start_time is None:
-      self.start_time = time.time()
+    if not robot_state or not goal_point:
+      return False
     x, y, theta = robot_state
+    
+    theta = -theta
+    print("theta = ", theta)
     x_goal, y_goal = goal_point
     delta_x = x_goal - x
     delta_y = y_goal - y
     distance_to_goal = np.sqrt(delta_x ** 2 + delta_y ** 2)
     self.distance_to_goal = distance_to_goal
-    if distance_to_goal < self.goal_range:
-      print('reached goal')
+    
+    angle_to_goal = np.arctan2(-delta_y, delta_x)
+    
+    alpha = - theta + angle_to_goal
+    beta = - (theta + alpha)
+
+    if(alpha > np.pi):
+      alpha = alpha - 2 *np.pi
+    elif (alpha < -np.pi):
+      alpha = alpha + 2 * np.pi
+
+    v = self.Kp * self.distance_to_goal
+    omega = self.Ka * alpha + self.Kb * beta
+
+    if(self.distance_to_goal > 500):
+      v = 250 * self.wheel_radis
+    if(self.distance_to_goal < 50):
+      v = 100 * self.wheel_radis
+    if(self.distance_to_goal < self.goal_range):
+      v_L = int((self.L * omega / 2) / self.wheel_radis)
+      v_R = int((self.L * omega / 2) / self.wheel_radis)
+
+      self.set_motor_speed(v_L, v_R)
       return True
-    angle_to_goal = np.arctan2(delta_y, delta_x)
-    angle_error = angle_to_goal - theta
-    # v = self.Ka * distance_to_goal
-    v = 80
-    omega = self.Kb * angle_error
-    v = max(-self.max_velocity, min(v, self.max_velocity))
-    omega = max(-self.max_omega, min(omega, self.max_omega))
-    self.set_motor_speed(v+omega, v-omega)
+    
+    v_L =  int((v - (self.L * omega / 2)) / self.wheel_radis)
+    v_R = int((v + (self.L * omega / 2)) / self.wheel_radis)
+
+    self.set_motor_speed(v_L, v_R)
     return False
+
 
   def get_displacement(self):
     motor_speed = self.get_motor_speed()
