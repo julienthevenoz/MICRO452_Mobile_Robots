@@ -85,8 +85,8 @@ class Analysis:
         hist = cv2.calcHist([lab_img[:, :, 0]], [0], None, [180], [0, 180])  # 180 bins for L in the range [0, 180]
         signal = np.gradient(medfilt(hist.flatten(), 15))  # Median filtering to smooth the signal
 
-        grad_threshold = -10
-        highest = 125
+        grad_threshold = -15
+        highest = 110
 
         # 3. Search for the threshold in the signal
         crossing_index = -1
@@ -94,12 +94,6 @@ class Analysis:
             if signal[i] < grad_threshold:
                 crossing_index = i
                 break
-
-        # # Find the threshold
-        # # if crossing_index != -1:
-        # #     print(f"The highest index where the signal crosses {grad_threshold} is {crossing_index}.")
-        # # else:
-        # #     print(f"No crossing found before index {highest}.")
 
         treshold = crossing_index
 
@@ -232,7 +226,7 @@ class Analysis:
         try:
             tl,tr,br,bl = marker
         except:
-            print("THE FUCKING BUG ")
+            print(f"THE FUCKING BUG : markers {self.buggy_markers}, ids = {self.saved_ids}")
             tl,tr,br,bl = marker
 
         
@@ -378,8 +372,7 @@ class Analysis:
         #draw red points for points already travelled
         if past_kalman_estimates:
             for position in past_kalman_estimates:
-                if position != [-1,1]:
-                    cv2.circle(img_with_path, np.array(position,dtype="int32"), 2, (0,0,255), -1)
+                cv2.circle(img_with_path, np.array(position,dtype="int32"), 2, (0,0,255), -1)
         return img_with_path
 
     def detect_thymio_pose(self,thymio_marker):
@@ -418,12 +411,9 @@ class Analysis:
             #print("(get_2_markers) Thymio and Goal markers not detected")
             return None, None
         else:
-            # # Verify that we have at least the two desired markers
-            # if not (len(ids) >= 2):
-            #     print(f"(get_2_markers) Detected {len(ids)} markers instead of at least 2.")
-            #     #return markers.squeeze(), ids.squeeze()
             if not(4 in ids):
                 # print("(get_2_markers) Thymio not detected")
+                self.buggy_markers, self.buggy_ids = markers, ids
                 return None, markers
             if not(5 in ids):
                 #print("(get_2_markers) Goal not detected")
@@ -502,8 +492,8 @@ class CameraFeed(threading.Thread):
                 if self.analysis.path :
                     dijkstra_path_view = self.analysis.draw_path_on_image(self.analysis.path, self.past_kalman_estimates
                     )
-                else:
-                    print("No path")
+                # else:
+                    # print("No path")
                 #output variables :>
                 # - [x,y,theta] of thymio - [x,y] of goal   -list of obstacle corners (list of list ?)
                 #if they have not been detected, will return empty list []
@@ -514,9 +504,7 @@ class CameraFeed(threading.Thread):
                 obstacle_corners, filtered_mask, img_with_polygons = self.analysis.detect_obstacle_corners(top_view)
 
                 Thymio_marker, goal_marker = self.analysis.get_2_markers(top_view)
-                Thymio_marker, goal_marker = self.analysis.get_2_markers(top_view)
                 if Thymio_marker is not None: 
-                    robot_pose= self.analysis.detect_thymio_pose(Thymio_marker)  
                     robot_pose= self.analysis.detect_thymio_pose(Thymio_marker)  
 
                     arrow_length = 100
@@ -529,22 +517,15 @@ class CameraFeed(threading.Thread):
            
                 if goal_marker is not None:
                     goal_position = self.analysis.detect_goal_position(goal_marker)
-                    goal_position = self.analysis.detect_goal_position(goal_marker)
                     if Thymio_marker is not None:
                         top_view = cv2.arrowedLine(top_view.copy(), np.array(robot_pose[:2],dtype='int32'), np.array(goal_position, dtype='int32'), (255, 0, 0), 8)
-                #else:
-                #    print("Goal not detected")
+                else:
+                   print("Goal not detected")
 
                 #update attributes
                 self.obstacle_corners = obstacle_corners
                 self.robot_pose = robot_pose
                 self.goal_position = goal_position
-
-                #update past_kalman_estimates:
-                if robot_pose:
-                    self.past_kalman_estimates.append(robot_pose[:2])
-                else:
-                    self.past_kalman_estimates.append([-1,-1])
                 
                 videofeeds_list = [frame, filtered_mask, img_with_polygons, annotated_img, top_view, dijkstra_path_view]
                 titles_list = ["Original", "filtered_mask", "Processed_with_polygones", "Highlighting corners", "thymio Oops, baby", "dijkstra_path_view"]
@@ -608,9 +589,4 @@ def main():
 
 
 if __name__ == "__main__":
-    img = cv2.imread("Photos/Tymio_islands_resised.jpg")
-    ana = Analysis()
-    ana.frame = img
-    ana.detect_obstacle_corners()
-
-
+    main()

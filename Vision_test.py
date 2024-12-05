@@ -16,7 +16,7 @@ hist = cv2.calcHist([image[:,:,0]], [0], None, [180], [0, 180])  # 180 bins for 
 signal = np.gradient(medfilt(hist.flatten(), 15))
 higest = 125
 
-grad_threshold = -10
+grad_threshold = -20
 highest = 125
 
 # Iterate through the gradient to find the highest index crossing the threshold
@@ -37,7 +37,7 @@ obstacles = np.uint8(mask * 255)
 
 
 # Minimum size threshold for connected components
-COUNT = 2000
+COUNT = 3000
 num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(obstacles, connectivity=8)
 filtered_mask = np.zeros_like(obstacles)
 for i in range(1, num_labels):  # Skip label 0 (background)
