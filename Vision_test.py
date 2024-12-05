@@ -61,7 +61,7 @@ ax[0].axis("off")
 ax[1].plot(signal, color='orange', lw=2)
 ax[1].set_title("Histogram of Values")
 ax[1].set_xlabel("Value")
-ax[1].set_ylabel("Frequency")
+ax[1].set_ylabel("Frequency gradient")
 ax[1].axvline(treshold, color='green', linestyle='--', label=f'Treshold = {treshold:.2f}')
 
 ax[1].grid(alpha=0.5)
@@ -69,7 +69,7 @@ ax[1].legend()
 
 # Plot 3: Dilated Binary Mask
 ax[2].imshow(filtered_mask, cmap='gray')
-ax[2].set_title("Dilated Binary Mask")
+ax[2].set_title("Binary Mask after processing")
 ax[2].axis("off")
 
 # Adjust layout and show the plot
