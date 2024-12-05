@@ -184,8 +184,8 @@ class Analysis:
         detector = cv2.aruco.ArucoDetector(dictionary, parameters)
 
         markerCorners, markerIds, _ = detector.detectMarkers(gray)
-        if markerIds is not None:
-            frame_markers = cv2.aruco.drawDetectedMarkers(img.copy(), markerCorners, markerIds)
+        # if markerIds is not None:
+        #     frame_markers = cv2.aruco.drawDetectedMarkers(img.copy(), markerCorners, markerIds)
             #print(f"Detected markers: {markerIds.flatten()}")
         #else:
         #    print("no markers")
@@ -283,24 +283,15 @@ class Analysis:
         # obtain a consistent order of the points and unpack them
         # individually''
         (tl, tr, br, bl) = pts.astype('int32')
-        # compute the width of the new image, which will be the
-        # maximum distance between bottom-right and bottom-left
-        # x-coordiates or the top-right and top-left x-coordinates
-        widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
-        widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
-        maxWidth = max(int(widthA), int(widthB))
-        # compute the height of the new image, which will be the
-        # maximum distance between the top-right and bottom-right
-        # y-coordinates or the top-left and bottom-left y-coordinates
-        heightA = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
-        heightB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
-        maxHeight = max(int(heightA), int(heightB))
-        # now that we have the dimensions of the new image, construct
-        # the set of destination points to obtain a "birds eye view",
+
+        #get fixed resized image dimensions
+        maxWidth, maxHeight = self.map_size
+        
+        # construct the set of destination points to obtain a "birds eye view",
         # (i.e. top-down view) of the image, again specifying points
         # in the top-left, top-right, bottom-right, and bottom-left
         # order
-        maxWidth, maxHeight = self.map_size
+    
         dst = np.array([
             [0, 0],
             [maxWidth - 1, 0],
@@ -310,25 +301,9 @@ class Analysis:
         M = cv2.getPerspectiveTransform(pts.astype('float32'), dst)
         warped = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
         # warped = cv2.putText(warped, f"{maxWidth} x {maxHeight}", (100,100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 3)
-        self.highlight_corners(warped, dst)
+        self.highlight_corners(warped, dst)  #what the hell does this do
         # return the warped image
         return warped, M
-
-    def rescale_points(self,pts):
-        '''Takes a list of points given in pixel coordinates of the original image and 
-        rescale them according to our map coordinates'''
-
-        x_min = np.min(self.map_corners[:,0]) #find the min on the x-axis
-        x_max = np.max(self.map_corners[:,0])
-        y_min = np.min(self.map_corners[:,1]) #find the min on the y-ayis
-        y_max = np.max(self.map_corners[:,1])
-        rescaled_pts = []
-        for pt in pts:
-            rescaled_x, rescaled_y = pt
-            rescaled_x = self.map_size[0]*(rescaled_x - x_min) / (x_max - x_min)  #map scale * (x normalized w/ regard to map pixel dimensions)
-            rescaled_y = self.map_size[1]*(rescaled_y - y_min) / (y_max - y_min)
-            rescaled_pts.append((rescaled_x, rescaled_y))
-        return rescaled_pts
         
     def highlight_corners(self, image, corners, title='highlighted corners', show=True):
         '''Draws a circle around the corners detected in this iteration,
@@ -428,12 +403,6 @@ class Analysis:
             elif marker_id == 5:  # Replace '5' with the actual ID for Goal
                 goal_marker = marker
 
-        # if thymio_marker is None:
-        #     print("Unable to detect Thymio.")
-        #     #return False
-        # if goal_marker is None:
-        #     print("Unable to detect the Goal marker.")
-            #return False
         return thymio_marker, goal_marker
 
     def resize_image(self, img):
@@ -490,10 +459,8 @@ class CameraFeed(threading.Thread):
                 dijkstra_path_view = top_view
 
                 if self.analysis.path :
-                    dijkstra_path_view = self.analysis.draw_path_on_image(self.analysis.path, self.past_kalman_estimates
-                    )
-                # else:
-                    # print("No path")
+                    dijkstra_path_view = self.analysis.draw_path_on_image(self.analysis.path, self.past_kalman_estimates)
+
                 #output variables :>
                 # - [x,y,theta] of thymio - [x,y] of goal   -list of obstacle corners (list of list ?)
                 #if they have not been detected, will return empty list []
