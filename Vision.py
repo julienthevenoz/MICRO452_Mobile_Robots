@@ -215,7 +215,6 @@ class Analysis:
         try:
             tl,tr,br,bl = marker
         except:
-            print(f"THE FUCKING BUG : markers {self.buggy_markers}, ids = {self.saved_ids}")
             tl,tr,br,bl = marker
 
         
@@ -460,15 +459,15 @@ class CameraFeed(threading.Thread):
                     end_x = int(robot_pose[0] + arrow_length * np.cos(robot_pose[2]))
                     end_y = int(robot_pose[1] + arrow_length * np.sin(robot_pose[2]))
                     top_view = cv2.arrowedLine(top_view.copy(), np.array(robot_pose[:2],dtype='int32'), (end_x, end_y), (0, 0, 255), 5)
-                else:
-                     print("Thymio not detected")
+                #else:
+                #     print("Thymio not detected")
            
                 if goal_marker is not None:
                     goal_position = self.analysis.detect_goal_position(goal_marker)
                     if Thymio_marker is not None:
                         top_view = cv2.arrowedLine(top_view.copy(), np.array(robot_pose[:2],dtype='int32'), np.array(goal_position, dtype='int32'), (255, 0, 0), 8)
-                else:
-                   print("Goal not detected")
+                #else:
+                #   print("Goal not detected")
 
                 #update attributes
                 self.obstacle_corners = obstacle_corners

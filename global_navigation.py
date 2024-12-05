@@ -53,7 +53,7 @@ class GlobalNavigation:
 
      #if we don't detect goal or thymio, use last saved position
     if thymio == [] or thymio is None:
-        print(0)
+        #print(0)
         if self.last_thymio is None: #was never found, still initialized as None
            return None, 0, None
         thymio = self.last_thymio
@@ -72,7 +72,6 @@ class GlobalNavigation:
     try :
         thymio_x, thymio_y, theta = thymio
     except : 
-       print("Qu'estce a direque ceci",type(thymio), thymio)
        thymio_x, thymio_y, theta = thymio
 
     start = (thymio_x, thymio_y)
