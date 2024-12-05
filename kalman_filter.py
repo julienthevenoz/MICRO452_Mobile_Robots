@@ -48,7 +48,6 @@ class KalmanFilter:
         measurement = np.array(measurement)
         u = np.array([vl, vr])
         A = self.A
-        print("change something")
         B = np.array([[np.cos(self.kal_state[2]) / 2, np.cos(self.kal_state[2]) / 2],
                       [np.sin(self.kal_state[2]) / 2, np.sin(self.kal_state[2]) / 2],
                       [1 / (2 * self.L), - 1 / (2 * self.L) ]])

@@ -166,16 +166,6 @@ class GlobalNavigation:
 
 # Test function for the GlobalNavigation class
 if __name__ == "__main__":
-    # Define some obstacles
-    # obstacles = [
-    #     [(2, 2), (4, 2), (4, 4), (2, 4)],  # Square obstacle
-    #     [(6, 6), (8, 6), (8, 8), (6, 8)]  # Another square obstacle
-    # ]
-    # obstacles = []
-    #
-    # # Start and goal points
-    # start = (0, 0)
-    # goal = (10, 10)
     thymio = [201, 143, 1.055]
     goal = [406.53833, 69.10376]
     obstacles = [[[464, 321], [366, 321], [404, 238]],

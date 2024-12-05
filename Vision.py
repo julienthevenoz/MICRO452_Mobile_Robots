@@ -184,13 +184,6 @@ class Analysis:
         detector = cv2.aruco.ArucoDetector(dictionary, parameters)
 
         markerCorners, markerIds, _ = detector.detectMarkers(gray)
-        # if markerIds is not None:
-        #     frame_markers = cv2.aruco.drawDetectedMarkers(img.copy(), markerCorners, markerIds)
-            #print(f"Detected markers: {markerIds.flatten()}")
-        #else:
-        #    print("no markers")
-
-        #we want to get rid of the tuple around the array, and the extra dimention it implies
         markerCorners = squeeze(markerCorners)#np.array(markerCorners).squeeze() 
         
         return markerCorners, markerIds
@@ -208,11 +201,7 @@ class Analysis:
             return None, None
         #print(f"Detected {len(ids)} markers : {list(squeeze(ids))}")
         if markers.shape == (0,):
-            return squeeze(markers), squeeze(ids)
-        #verifiy that we have the 6 markers   
-        # if not(len(ids)==6):
-        #     print(f"Detected {len(ids)} markers instead of 6")
-        #if we have multiple markers, we need to order them    
+            return squeeze(markers), squeeze(ids)  
         if not(len(ids)== 1):
             pairs = sorted(list(zip(ids,markers))) #make a list of corresponding [id,marker] pairs, then sort it
             ids, markers = zip(*pairs) #unzip the pairs : ids are now in order 0-5 and the corresponding aruco corner markers are in the same order
@@ -286,11 +275,6 @@ class Analysis:
 
         #get fixed resized image dimensions
         maxWidth, maxHeight = self.map_size
-        
-        # construct the set of destination points to obtain a "birds eye view",
-        # (i.e. top-down view) of the image, again specifying points
-        # in the top-left, top-right, bottom-right, and bottom-left
-        # order
     
         dst = np.array([
             [0, 0],
@@ -461,9 +445,6 @@ class CameraFeed(threading.Thread):
                 if self.analysis.path :
                     dijkstra_path_view = self.analysis.draw_path_on_image(self.analysis.path, self.past_kalman_estimates)
 
-                #output variables :>
-                # - [x,y,theta] of thymio - [x,y] of goal   -list of obstacle corners (list of list ?)
-                #if they have not been detected, will return empty list []
                 robot_pose = []
                 goal_position = []
                 obstacle_corners = []

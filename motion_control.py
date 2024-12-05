@@ -69,7 +69,6 @@ class MotionControl:
     x, y, theta = robot_state
     
     theta = -theta
-    print("theta = ", theta)
     x_goal, y_goal = goal_point
     delta_x = x_goal - x
     delta_y = y_goal - y
@@ -142,47 +141,3 @@ class MotionControl:
   def read_prox_sensors(self):
     prox = self.thymio.read_prox_sensors()
     return prox
-
-
-  # def apply_motor_command_owen(self, robot_state, goal_point):
-  #       """
-  #       Applies the astolfi command in accordance to the goal and the position we have given to
-  #       """
-  #       KAPPA_RHO = 1
-  #       KAPPA_ALPHA = 300 * 6
-  #       KAPPA_BETA = -70 * 0.2
-  #       WHEEL_DISTANCE = 0.09  # in m
-  #       if not robot_state or not goal_point:
-  #         return False
-  #       x, y, theta = robot_state
-        
-  #       theta = -theta
-  #       #print(theta)
-  #       x_goal, y_goal = goal_point
-  #       delta_x = x_goal - x
-  #       delta_y = y_goal - y
-      
-  #       rho = np.sqrt(delta_x** 2 + delta_y ** 2)
-  #       if rho < self.goal_range:
-  #           self.on_objective = True
-  #           return
-  #       # we add np.pi to position[2] in order to adapt to alstofy referential
-  #       alpha = self.convert_angle(-theta + np.pi + np.arctan2(-delta_y, delta_x))
-  #       beta = self.convert_angle(-theta - alpha + np.pi)
-  #       forward_speed = KAPPA_RHO * rho
-  #       turning_velocity = -(WHEEL_DISTANCE / 2) * (KAPPA_ALPHA * alpha + KAPPA_BETA * beta)
-  #       if forward_speed > 150:
-  #           turning_velocity *= 150 / forward_speed
-  #           forward_speed = 150
-
-  #       movement_array = [-turning_velocity + forward_speed, turning_velocity + forward_speed]
-  #       self.set_motor_speed(int(np.floor(movement_array[1])),
-  #                             int(np.floor(movement_array[0])))
-  #       return False
-
-  # def convert_angle(self, angle):
-  #   #convert angle to rad and limit to -pi to pi
-  #   angle = angle % (2*np.pi)
-  #   if angle >= np.pi:
-  #       angle -= 2*np.pi
-  #   return angle
