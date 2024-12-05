@@ -52,25 +52,15 @@ filtered_mask = cv2.erode(filtered_mask, kernel)
 
 fig, ax = plt.subplots(1, 3, figsize=(15, 5))
 
-# Plot 1: Original Image
-ax[0].imshow(cv2.cvtColor(original, cv2.COLOR_BGR2RGB))  # Convert BGR to RGB for matplotlib
-ax[0].set_title("Original Image")
-ax[0].axis("off")
+# Invert the colors and display the image in full window mode
+inverted_mask = cv2.bitwise_not(filtered_mask)  # Invert the colors (black to white and vice versa)
 
-# Plot 2: Hue Histogram
-ax[1].plot(signal, color='orange', lw=2)
-ax[1].set_title("Histogram of Values")
-ax[1].set_xlabel("Value")
-ax[1].set_ylabel("Frequency gradient")
-ax[1].axvline(treshold, color='green', linestyle='--', label=f'Treshold = {treshold:.2f}')
-
-ax[1].grid(alpha=0.5)
-ax[1].legend()
-
-# Plot 3: Dilated Binary Mask
-ax[2].imshow(filtered_mask, cmap='gray')
-ax[2].set_title("Binary Mask after processing")
-ax[2].axis("off")
+# Configure the display for full-window mode
+plt.figure(figsize=(12, 12))  # Adjust size for a larger display
+plt.imshow(inverted_mask, cmap='gray')  # Use 'gray' colormap for inverted binary mask
+plt.axis("off")  # Remove axes for a cleaner look
+plt.tight_layout()  # Use tight layout for full coverage of display area
+plt.show()
 
 # Adjust layout and show the plot
 plt.tight_layout()
